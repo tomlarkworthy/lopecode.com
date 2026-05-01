@@ -1,0 +1,10 @@
+{
+  "name": "lopecode.com",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Web origin for lopecode — Pages, Workers, indexer, feed generator.",
+  "scripts": {
+    "preview": "python3 -m http.server 8788 --directory pages/public --bind 127.0.0.1",
+    "preview:cf": "bunx wrangler pages dev pages/public --port 8788"
+  }
+}

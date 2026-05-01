@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>lopecode.com</title>
+<meta name="description" content="lopecode is a self-serializing notebook format on the atmosphere. Public profile pages, web proxy, OAuth, indexer, and feed generator all live here.">
+<style>
+  :root { color-scheme: light dark }
+  html, body { margin: 0; padding: 0 }
+  body { font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: #fafafa; color: #111 }
+  @media (prefers-color-scheme: dark) { body { background: #0e0e10; color: #eaeaea } }
+  main { max-width: 42rem; margin: 8vh auto 4rem; padding: 0 1.25rem }
+  h1 { font-size: 2rem; margin: 0 0 0.5rem; letter-spacing: -0.01em }
+  .lede { font-size: 1.1rem; margin: 0 0 1.5rem; opacity: 0.8 }
+  h2 { font-size: 1.1rem; margin: 2rem 0 0.5rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.04em }
+  ul { padding-left: 1.25rem }
+  li { margin: 0.35rem 0 }
+  code { font: 0.92em ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(127,127,127,0.12); padding: 1px 5px; border-radius: 3px }
+  a { color: #2962ff }
+  @media (prefers-color-scheme: dark) { a { color: #82b1ff } }
+  footer { font-size: 0.85rem; opacity: 0.6; margin-top: 3rem }
+</style>
+</head>
+<body>
+<main>
+  <h1>lopecode</h1>
+  <p class="lede">A self-serializing notebook format that publishes to the atmosphere.</p>
+
+  <p>This origin is the public surface for the lopecode network: profile pages, OAuth, the per-DID web proxy, an indexer, and a feed generator. Bundles themselves live on each author&rsquo;s PDS as <code>com.lopecode.bundle</code> records.</p>
+
+  <h2>Where to start</h2>
+  <ul>
+    <li><a href="https://github.com/tomlarkworthy/lopecode-dev">github.com/tomlarkworthy/lopecode-dev</a> &mdash; design notes, specs, and the agentic dev harness.</li>
+    <li><a href="https://github.com/tomlarkworthy/lopecode-dev/blob/main/specs/atproto.md">specs/atproto.md</a> &mdash; the v1 atproto integration plan this domain implements.</li>
+    <li><a href="https://tomlarkworthy.github.io/lopecode/notebooks/atproto.html">atproto.html</a> &mdash; in-notebook publisher and reader, runs entirely client-side.</li>
+  </ul>
+
+  <footer>Hosted on Cloudflare Pages. Source: <a href="https://github.com/tomlarkworthy/lopecode.com">tomlarkworthy/lopecode.com</a>.</footer>
+</main>
+</body>
+</html>
