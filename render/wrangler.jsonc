@@ -1,0 +1,11 @@
+{
+  "name": "lopecode-render",
+  "main": "dist/worker.js",
+  "compatibility_date": "2025-12-25",
+  "observability": { "enabled": true }
+  // No routes / Custom Domains — this Worker is reached only via a
+  // Service Binding from the apex `lopecode` Worker, which forwards
+  // did-*.lopecode.com/r/:rkey requests here. Building the bundle
+  // happens in the build step (esbuild via build.mjs); Workers Builds
+  // runs `npm run build` before `wrangler deploy`.
+}
