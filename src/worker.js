@@ -77,11 +77,11 @@ export default {
     }
     const rkey = p[1];
     const aturi = `at://${did}/com.lopecode.bundle/${rkey}`;
-    // Hash drives lopepage layout. `view=S100(@tomlarkworthy/at-read)` opens
-    // at-read fullscreen; `open=` triggers cell compute (lopepage only runs
-    // cells of modules named in open=). `at=` is the prefill consumed by
-    // at-read._ar_reader. Parens in `view=` are literal — don't URL-encode.
-    const hash = `#view=S100(@tomlarkworthy/at-read)&open=@tomlarkworthy/at-read&at=${encodeURIComponent(aturi)}`;
+    // `view=S100(@tomlarkworthy/at-read)` mounts at-read fullscreen and is
+    // sufficient on its own — adding `open=` on top double-mounts. `at=`
+    // is the prefill consumed by at-read._ar_reader. Parens in view= are
+    // literal — don't URL-encode them.
+    const hash = `#view=S100(@tomlarkworthy/at-read)&at=${encodeURIComponent(aturi)}`;
     return Response.redirect(`${AT_READ_BASE}${hash}`, 302);
   }
 };
