@@ -10,13 +10,23 @@
   html, body { margin: 0; padding: 0 }
   body { font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: #fafafa; color: #111 }
   @media (prefers-color-scheme: dark) { body { background: #0e0e10; color: #eaeaea } }
-  main { max-width: 42rem; margin: 8vh auto 4rem; padding: 0 1.25rem }
+  main { max-width: 42rem; margin: 6vh auto 4rem; padding: 0 1.25rem }
   h1 { font-size: 2rem; margin: 0 0 0.5rem; letter-spacing: -0.01em }
-  .lede { font-size: 1.1rem; margin: 0 0 1.5rem; opacity: 0.8 }
-  h2 { font-size: 1.1rem; margin: 2rem 0 0.5rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.04em }
-  ul { padding-left: 1.25rem }
-  li { margin: 0.35rem 0 }
-  code { font: 0.92em ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(127,127,127,0.12); padding: 1px 5px; border-radius: 3px }
+  .lede { font-size: 1.1rem; margin: 0 0 2rem; opacity: 0.8 }
+  h2 { font-size: 0.9rem; margin: 2.5rem 0 0.75rem; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.04em }
+  .feed-status { padding: 0.85rem 1rem; border-radius: 6px; background: rgba(127,127,127,0.08); font-size: 0.95rem }
+  .feed-status.error { background: rgba(183,28,28,0.08); color: #b71c1c }
+  @media (prefers-color-scheme: dark) { .feed-status.error { color: #ef9a9a } }
+  .feed { padding: 0; margin: 0; list-style: none }
+  .bundle { display: block; padding: 1rem 1.25rem; margin: 0.65rem 0; border-radius: 6px; background: rgba(127,127,127,0.06); text-decoration: none; color: inherit; transition: transform 0.1s, background 0.1s }
+  .bundle:hover { background: rgba(127,127,127,0.12); transform: translateX(2px) }
+  .bundle-title { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.25rem; color: #2962ff; word-break: break-word }
+  @media (prefers-color-scheme: dark) { .bundle-title { color: #82b1ff } }
+  .bundle-meta { font-size: 0.85rem; opacity: 0.65 }
+  .bundle-author { font-weight: 500 }
+  ul.links { padding-left: 1.25rem }
+  ul.links li { margin: 0.35rem 0 }
+  code { font: 0.9em ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(127,127,127,0.12); padding: 1px 5px; border-radius: 3px }
   a { color: #2962ff }
   @media (prefers-color-scheme: dark) { a { color: #82b1ff } }
   footer { font-size: 0.85rem; opacity: 0.6; margin-top: 3rem }
@@ -27,16 +37,84 @@
   <h1>lopecode</h1>
   <p class="lede">A self-serializing notebook format that publishes to the atmosphere.</p>
 
-  <p>This origin is the public surface for the lopecode network: profile pages, OAuth, the per-DID web proxy, an indexer, and a feed generator. Bundles themselves live on each author&rsquo;s PDS as <code>com.lopecode.bundle</code> records.</p>
+  <h2>Recent lopebooks</h2>
+  <div id="feed-status" class="feed-status">Loading&hellip;</div>
+  <ul id="feed" class="feed"></ul>
+
+  <h2>About</h2>
+  <p>This origin is the public surface for the lopecode network: profile pages, OAuth, the per-DID web proxy, an indexer, and a feed generator. Bundles live on each author&rsquo;s PDS as <code>com.lopecode.bundle</code> records.</p>
 
   <h2>Where to start</h2>
-  <ul>
+  <ul class="links">
     <li><a href="https://github.com/tomlarkworthy/lopecode-dev">github.com/tomlarkworthy/lopecode-dev</a> &mdash; design notes, specs, and the agentic dev harness.</li>
-    <li><a href="https://github.com/tomlarkworthy/lopecode-dev/blob/main/specs/atproto.md">specs/atproto.md</a> &mdash; the v1 atproto integration plan this domain implements.</li>
+    <li><a href="/spec">specs/atproto.md</a> &mdash; the v1 atproto integration plan this domain implements.</li>
     <li><a href="https://tomlarkworthy.github.io/lopecode/notebooks/atproto.html">atproto.html</a> &mdash; in-notebook publisher and reader, runs entirely client-side.</li>
   </ul>
 
-  <footer>Hosted on Cloudflare Pages. Source: <a href="https://github.com/tomlarkworthy/lopecode.com">tomlarkworthy/lopecode.com</a>.</footer>
+  <footer>Hosted on Cloudflare. Source: <a href="https://github.com/tomlarkworthy/lopecode.com">tomlarkworthy/lopecode.com</a>.</footer>
 </main>
+<script>
+(async function () {
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const statusEl = document.getElementById("feed-status");
+  const feedEl = document.getElementById("feed");
+
+  // Resolve a DID -> handle in one call. Best-effort; fall back to a
+  // shortened DID if the call fails.
+  const resolveHandle = async (did) => {
+    try {
+      const r = await fetch(`https://public.api.bsky.app/xrpc/com.atproto.repo.describeRepo?repo=${encodeURIComponent(did)}`);
+      if (!r.ok) throw new Error(String(r.status));
+      const { handle } = await r.json();
+      return handle || did;
+    } catch {
+      return did.replace(/^did:plc:/, "").slice(0, 10) + "…";
+    }
+  };
+
+  try {
+    const r = await fetch("https://contrail.lopecode.com/xrpc/com.lopecode.bundle.listRecords?limit=20&sort=createdAt&order=desc");
+    if (!r.ok) throw new Error(`indexer ${r.status}`);
+    const { records } = await r.json();
+
+    if (!records || records.length === 0) {
+      statusEl.textContent = "No lopebooks published yet.";
+      return;
+    }
+
+    statusEl.style.display = "none";
+
+    // DID -> handle resolution in parallel for the unique authors.
+    const dids = [...new Set(records.map(r => r.did))];
+    const handlesByDid = Object.fromEntries(
+      await Promise.all(dids.map(async did => [did, await resolveHandle(did)]))
+    );
+
+    feedEl.innerHTML = records.map(rec => {
+      const did = rec.did;
+      const rkey = rec.rkey;
+      const title = rec.value?.title || rkey;
+      const handle = handlesByDid[did] || did;
+      const created = rec.value?.createdAt
+        ? new Date(rec.value.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+        : "";
+      const fileCount = Array.isArray(rec.value?.files) ? rec.value.files.length : 0;
+      const meta = [
+        `<span class="bundle-author">@${esc(handle)}</span>`,
+        created,
+        `${fileCount} file${fileCount === 1 ? "" : "s"}`
+      ].filter(Boolean).join(" · ");
+      const didSubdomain = did.replace(/:/g, "-");
+      return `<li><a class="bundle" href="https://${esc(didSubdomain)}.lopecode.com/r/${esc(rkey)}">
+        <div class="bundle-title">${esc(title)}</div>
+        <div class="bundle-meta">${meta}</div>
+      </a></li>`;
+    }).join("\n");
+  } catch (err) {
+    statusEl.classList.add("error");
+    statusEl.textContent = `Couldn’t load feed: ${err.message}`;
+  }
+})();
+</script>
 </body>
 </html>
