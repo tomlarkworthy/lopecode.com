@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Profile &middot; lopecode.com</title>
+<style>
+  :root { color-scheme: light dark }
+  html, body { margin: 0; padding: 0 }
+  body { font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: #fafafa; color: #111 }
+  @media (prefers-color-scheme: dark) { body { background: #0e0e10; color: #eaeaea } }
+  main { max-width: 48rem; margin: 6vh auto 4rem; padding: 0 1.25rem }
+  h1 { font-size: 1.6rem; margin: 0 0 0.5rem; letter-spacing: -0.01em; word-break: break-word }
+  .lede { font-size: 1rem; opacity: 0.7; margin: 0 0 2rem }
+  .status { padding: 0.85rem 1rem; border-radius: 6px; background: rgba(127,127,127,0.08); font-size: 0.95rem }
+  .status.error { background: rgba(183,28,28,0.08); color: #b71c1c }
+  @media (prefers-color-scheme: dark) { .status.error { color: #ef9a9a } }
+  ul { padding: 0; margin: 0; list-style: none }
+  .bundle { display: block; padding: 1rem 1.25rem; margin: 0.65rem 0; border-radius: 6px; background: rgba(127,127,127,0.06); text-decoration: none; color: inherit; transition: transform 0.1s, background 0.1s }
+  .bundle:hover { background: rgba(127,127,127,0.12); transform: translateX(2px) }
+  .bundle-title { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.25rem; color: #2962ff; word-break: break-word }
+  @media (prefers-color-scheme: dark) { .bundle-title { color: #82b1ff } }
+  .bundle-meta { font-size: 0.85rem; opacity: 0.65 }
+  code { font: 0.9em ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(127,127,127,0.12); padding: 1px 5px; border-radius: 3px }
+  a { color: #2962ff }
+  @media (prefers-color-scheme: dark) { a { color: #82b1ff } }
+  footer { font-size: 0.85rem; opacity: 0.6; margin-top: 3rem }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Loading&hellip;</h1>
+  <p class="lede" id="lede"></p>
+  <div id="status" class="status" style="display:none"></div>
+  <ul id="bundles"></ul>
+  <footer>
+    <a href="/">lopecode.com</a> &middot; <a id="bsky-link" target="_blank" rel="noopener">Bluesky profile</a>
+  </footer>
+</main>
+<script>
+(async function () {
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const titleEl = document.getElementById("title");
+  const ledeEl = document.getElementById("lede");
+  const statusEl = document.getElementById("status");
+  const bundlesEl = document.getElementById("bundles");
+  const bskyLinkEl = document.getElementById("bsky-link");
+
+  const showStatus = (html, isError) => {
+    statusEl.style.display = "block";
+    statusEl.classList.toggle("error", !!isError);
+    statusEl.innerHTML = html;
+  };
+
+  // Parse handle from /@handle path. We rewrite /@* → /profile.html (200)
+  // in _redirects so the URL bar keeps the handle.
+  const m = location.pathname.match(/^\/@([^\/]+)/);
+  if (!m) {
+    titleEl.textContent = "Profile";
+    showStatus(`Profile URLs look like <code>/@handle.bsky.social</code>.`, true);
+    return;
+  }
+  const handle = decodeURIComponent(m[1]);
+  document.title = `@${handle} · lopecode.com`;
+  titleEl.textContent = `@${esc(handle)}`;
+  bskyLinkEl.href = `https://bsky.app/profile/${encodeURIComponent(handle)}`;
+
+  try {
+    showStatus("Resolving handle&hellip;");
+    const r1 = await fetch(`https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`);
+    if (!r1.ok) throw new Error(`No atproto account for ${handle}`);
+    const { did } = await r1.json();
+
+    showStatus("Resolving PDS&hellip;");
+    let doc;
+    if (did.startsWith("did:plc:")) {
+      const r = await fetch(`https://plc.directory/${did}`);
+      if (!r.ok) throw new Error(`plc.directory ${r.status}`);
+      doc = await r.json();
+    } else if (did.startsWith("did:web:")) {
+      const host = did.slice("did:web:".length).replace(/:/g, "/");
+      const r = await fetch(`https://${host}/.well-known/did.json`);
+      if (!r.ok) throw new Error(`did:web ${r.status}`);
+      doc = await r.json();
+    } else {
+      throw new Error(`Unsupported DID method: ${did}`);
+    }
+    const svc = (doc.service || []).find(s => s.id === "#atproto_pds" || s.type === "AtprotoPersonalDataServer");
+    if (!svc) throw new Error(`No PDS service for ${did}`);
+    const pds = svc.serviceEndpoint;
+
+    showStatus("Fetching bundles&hellip;");
+    const r2 = await fetch(`${pds}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(did)}&collection=com.lopecode.bundle&limit=100`);
+    if (!r2.ok) throw new Error(`listRecords ${r2.status}`);
+    const { records } = await r2.json();
+    statusEl.style.display = "none";
+
+    if (!records || records.length === 0) {
+      ledeEl.textContent = "No published lopebooks yet.";
+      return;
+    }
+
+    const didSubdomain = did.replace(/:/g, "-");
+    const sorted = records.slice().sort((a, b) => (b.value?.createdAt || "").localeCompare(a.value?.createdAt || ""));
+    ledeEl.textContent = `${sorted.length} published lopebook${sorted.length === 1 ? "" : "s"}`;
+
+    bundlesEl.innerHTML = sorted.map(rec => {
+      const rkey = rec.uri.split("/").pop();
+      const title = rec.value?.title || rkey;
+      const created = rec.value?.createdAt
+        ? new Date(rec.value.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+        : "";
+      const fileCount = Array.isArray(rec.value?.files) ? rec.value.files.length : 0;
+      const meta = [created, `${fileCount} file${fileCount === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
+      return `<li><a class="bundle" href="https://${esc(didSubdomain)}.lopecode.com/r/${esc(rkey)}">
+        <div class="bundle-title">${esc(title)}</div>
+        <div class="bundle-meta">${esc(meta)}</div>
+      </a></li>`;
+    }).join("\n");
+  } catch (err) {
+    showStatus(`Failed: ${esc(err.message)}`, true);
+  }
+})();
+</script>
+</body>
+</html>
