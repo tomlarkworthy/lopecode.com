@@ -1,6 +1,2 @@
-# Rewrite (200) so /oauth/callback serves the .html. Matches the
-# redirect_uris value in oauth/client.json without the .html suffix.
-/oauth/callback  /oauth/callback.html  200
-
 # Stable shortlink to the atproto integration spec.
-/spec            https://github.com/tomlarkworthy/lopecode-dev/blob/main/specs/atproto.md  302
+/spec  https://github.com/tomlarkworthy/lopecode-dev/blob/main/specs/atproto.md  302
