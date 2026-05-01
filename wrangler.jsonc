@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lopecode",
+  "compatibility_date": "2025-04-01",
+
+  // Static-assets-only Worker. No `main` script — every request is served
+  // straight from `pages/public/`. Workers Static Assets is the unified
+  // successor to Cloudflare Pages; a real Worker entry can be added later
+  // (e.g. for the per-DID web proxy on *.lopecode.com) without disturbing
+  // the static surface.
+  "assets": {
+    "directory": "./pages/public",
+    "not_found_handling": "404-page"
+  }
+}
