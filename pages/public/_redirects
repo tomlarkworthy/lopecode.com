@@ -1,6 +1,7 @@
-# Profile pages: /@handle is rewritten to /profile.html so the URL stays
-# /@handle in the address bar; the page reads location.pathname for the handle.
-/@*    /profile.html  200
+# Profile pages: /@handle is rewritten to /profile (no .html suffix
+# so Workers Static Assets' auto html_handling doesn't 307 it back).
+# The page reads location.pathname for the handle.
+/@*    /profile  200
 
 # Stable shortlink to the atproto integration spec.
 /spec  https://github.com/tomlarkworthy/lopecode-dev/blob/main/specs/atproto.md  302
