@@ -7,7 +7,7 @@
     {
       "binding": "DB",
       "database_name": "lopecode-contrail",
-      "database_id": "REPLACE_WITH_D1_ID"
+      "database_id": "952ddee3-3e52-492e-97fc-3a703601c10d"
     }
   ],
   "triggers": {
