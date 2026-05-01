@@ -15,14 +15,19 @@
     "not_found_handling": "404-page"
   },
 
-  // Narrowed wildcard Route claims only did-*.lopecode.com for the
-  // per-DID proxy. The apex (lopecode.com) and www are bound via Custom
-  // Domains in the dashboard; both end up on this same Worker. Other
-  // subdomains (e.g. contrail.lopecode.com) are free for sibling Workers
-  // to claim via their own Custom Domains without competing precedence.
-  // Requires a wildcard DNS record (`*` AAAA → `100::` proxied) so the
-  // Route can intercept.
+  // Wildcard Route claims *.lopecode.com so the per-DID proxy can run
+  // on did-{method}-{rest}.lopecode.com. The apex (lopecode.com) and
+  // www are bound via Custom Domains. Other subdomains (e.g.
+  // contrail.lopecode.com) are forwarded to sibling Workers via the
+  // service bindings below — Custom Domain precedence is unreliable in
+  // the presence of a wildcard Route, so explicit forwarding is safer.
+  // Requires a wildcard DNS record (`*` AAAA → `100::` proxied) for the
+  // Route to intercept.
   "routes": [
-    { "pattern": "did-*.lopecode.com/*", "zone_name": "lopecode.com" }
+    { "pattern": "*.lopecode.com/*", "zone_name": "lopecode.com" }
+  ],
+
+  "services": [
+    { "binding": "CONTRAIL", "service": "lopecode-contrail" }
   ]
 }

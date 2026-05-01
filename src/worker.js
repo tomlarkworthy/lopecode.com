@@ -16,6 +16,13 @@
 
 const APEX_HOSTS = new Set(["lopecode.com", "www.lopecode.com"]);
 
+// Sibling Workers we forward to. The wildcard route on this Worker
+// shadows Custom Domain bindings on sibling Workers, so explicit
+// host-based forwarding via service bindings is the reliable path.
+const SIBLING_HOSTS = {
+  "contrail.lopecode.com": "CONTRAIL"
+};
+
 // did-{method}-{rest}.lopecode.com — method is alpha (plc / web / key /
 // …), rest is alphanumeric (PLC ids are base32, lowercase a–z 2–7).
 const SUBDOMAIN_RE = /^did-([a-z]+)-([a-z0-9]+)\.lopecode\.com$/i;
@@ -63,6 +70,11 @@ export default {
 
     if (APEX_HOSTS.has(host)) {
       return env.ASSETS.fetch(request);
+    }
+
+    const sibling = SIBLING_HOSTS[host];
+    if (sibling) {
+      return env[sibling].fetch(request);
     }
 
     const m = host.match(SUBDOMAIN_RE);
