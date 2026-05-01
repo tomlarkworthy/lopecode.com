@@ -9,15 +9,15 @@ The apex (`lopecode.com`) is served by a **Workers Static Assets** project named
 ## Repository layout
 
 ```
-wrangler.jsonc            # Worker config: name, compat date, assets binding
+wrangler.jsonc            # Worker config: routes, assets binding
+src/worker.js             # Worker entry: Host-based routing
 pages/public/             # Static assets served at lopecode.com (apex)
-workers/proxy/            # (planned) wildcard *.lopecode.com web proxy Worker
 workers/feed/             # (planned) feed.lopecode.com feed-generator Worker
 contrail/                 # (planned) Contrail indexer Worker + D1
-lexicons/                 # (planned) com.lopecode.* lexicon JSONs
+lexicons/                 # (planned) com.lopecode.* lexicon JSONs (no current consumer)
 ```
 
-Only the apex Worker (`wrangler.jsonc` + `pages/public/`) is wired up so far. Everything else is added in subsequent commits as the v1 plan progresses.
+The Worker handles both the apex static surface and the per-DID web proxy on `*.lopecode.com` — it routes by Host. Apex/www requests delegate to the ASSETS binding; `did-{method}-{rest}.lopecode.com/r/:rkey` requests 302 to the canonical at-read on GitHub Pages with the `at://` URI in the hash. Future Workers (feed generator, Contrail indexer) live in their own subdirectories on dedicated subdomains.
 
 ## Local preview
 
@@ -59,6 +59,14 @@ Registration stays at Namecheap; only DNS authority moves. This is required for 
 6. **Settings → Domains & Routes**:
    - Optionally enable the `lopecode.<account>.workers.dev` URL for ad-hoc testing.
    - **Add Custom Domain** → `lopecode.com` and `www.lopecode.com`. Cloudflare creates the routing records itself (DNS is already on Cloudflare).
+
+#### 3. Wildcard DNS for the per-DID web proxy
+
+The Worker claims `*.lopecode.com/*` via a Route declared in `wrangler.jsonc`. For the Route to intercept anything, DNS has to resolve. Add one record:
+
+- DNS → **Add record** → Type **AAAA** → Name **`*`** → IPv6 address **`100::`** (the discard prefix; never reachable, but resolves) → Proxy status **Proxied** (orange cloud).
+
+Cloudflare's edge sees the proxied wildcard, the Worker Route matches, and `did-…lopecode.com/r/:rkey` is served by `src/worker.js` before any actual origin is hit. Universal SSL already covers `*.lopecode.com` so HTTPS just works.
 
 PR previews are on by default — every PR triggers a non-production Workers build with its own preview URL.
 

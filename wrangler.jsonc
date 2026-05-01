@@ -1,15 +1,25 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lopecode",
+  "main": "./src/worker.js",
   "compatibility_date": "2025-04-01",
 
-  // Static-assets-only Worker. No `main` script — every request is served
-  // straight from `pages/public/`. Workers Static Assets is the unified
-  // successor to Cloudflare Pages; a real Worker entry can be added later
-  // (e.g. for the per-DID web proxy on *.lopecode.com) without disturbing
-  // the static surface.
+  // Worker handles every request and routes by Host: apex/www delegate
+  // to the ASSETS binding (static surface in pages/public/), while
+  // did-{method}-{rest}.lopecode.com runs the per-DID web proxy. See
+  // src/worker.js for routing logic.
   "assets": {
     "directory": "./pages/public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
     "not_found_handling": "404-page"
-  }
+  },
+
+  // Wildcard subdomain Route claims *.lopecode.com for the proxy. The
+  // apex (lopecode.com) and www are bound via Custom Domains in the
+  // dashboard; both end up on this same Worker. Requires a wildcard DNS
+  // record (`*` AAAA → `100::` proxied) so the Route can intercept.
+  "routes": [
+    { "pattern": "*.lopecode.com/*", "zone_name": "lopecode.com" }
+  ]
 }
