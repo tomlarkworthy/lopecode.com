@@ -1,0 +1,41 @@
+{
+  "lexicon": 1,
+  "id": "com.lopecode.bundle",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["title", "files", "createdAt"],
+        "properties": {
+          "title": { "type": "string", "maxLength": 200 },
+          "files": {
+            "type": "array",
+            "items": { "type": "ref", "ref": "#fileEntry" }
+          },
+          "createdAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    },
+    "fileEntry": {
+      "type": "object",
+      "required": ["id", "encoding", "blob"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Script tag id, e.g. `@user/module`, `@user/module/asset.png`, `bootconf.json`"
+        },
+        "encoding": {
+          "type": "string",
+          "enum": ["text", "base64"]
+        },
+        "blob": {
+          "type": "blob",
+          "description": "atproto blob ref — CID (v1 raw + sha-256), mimeType, size"
+        }
+      }
+    }
+  }
+}

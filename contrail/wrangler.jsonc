@@ -1,0 +1,19 @@
+{
+  "name": "lopecode-contrail",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-12-25",
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lopecode-contrail",
+      "database_id": "REPLACE_WITH_D1_ID"
+    }
+  ],
+  "triggers": {
+    "crons": ["*/1 * * * *"]
+  }
+  // Custom Domain `contrail.lopecode.com` is bound via the CF dashboard
+  // after first deploy. Custom Domain bindings take precedence over the
+  // existing wildcard route on the lopecode worker.
+}

@@ -1,0 +1,33 @@
+{
+  "lexicon": 1,
+  "id": "com.lopecode.authFull",
+  "defs": {
+    "main": {
+      "type": "permission-set",
+      "title": "com.lopecode",
+      "description": "Full access to the com.lopecode service",
+      "permissions": [
+        {
+          "type": "permission",
+          "resource": "rpc",
+          "aud": "*",
+          "lxm": [
+            "com.lopecode.bundle.getRecord",
+            "com.lopecode.bundle.listRecords",
+            "com.lopecode.getCursor",
+            "com.lopecode.getOverview",
+            "com.lopecode.getProfile",
+            "com.lopecode.notifyOfUpdate"
+          ]
+        },
+        {
+          "type": "permission",
+          "resource": "repo",
+          "collection": [
+            "com.lopecode.bundle"
+          ]
+        }
+      ]
+    }
+  }
+}

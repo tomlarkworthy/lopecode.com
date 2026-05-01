@@ -1,0 +1,22 @@
+{
+  "name": "lopecode-contrail",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "atproto indexer for com.lopecode.bundle (contrail.lopecode.com).",
+  "scripts": {
+    "lex:gen": "contrail-lex generate",
+    "deploy": "wrangler deploy",
+    "dev": "contrail dev",
+    "backfill": "contrail backfill --remote"
+  },
+  "dependencies": {
+    "@atmo-dev/contrail": "^0.4.2"
+  },
+  "devDependencies": {
+    "@atmo-dev/contrail-lexicons": "^0.4.2",
+    "@cloudflare/workers-types": "^4.20250124.0",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.63.0"
+  }
+}
