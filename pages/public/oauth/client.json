@@ -1,0 +1,12 @@
+{
+  "client_id": "https://lopecode.com/oauth/client.json",
+  "client_name": "lopecode",
+  "client_uri": "https://lopecode.com",
+  "redirect_uris": ["https://lopecode.com/oauth/callback"],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "scope": "atproto transition:generic",
+  "application_type": "web",
+  "token_endpoint_auth_method": "none",
+  "dpop_bound_access_tokens": true
+}

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>OAuth callback &middot; lopecode.com</title>
+<style>
+  :root { color-scheme: light dark }
+  body { font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; margin: 0; padding: 8vh 1.25rem; background: #fafafa; color: #111; text-align: center }
+  @media (prefers-color-scheme: dark) { body { background: #0e0e10; color: #eaeaea } }
+  main { max-width: 32rem; margin: 0 auto }
+  p { opacity: 0.75 }
+  code { font: 0.92em ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(127,127,127,0.12); padding: 1px 5px; border-radius: 3px }
+</style>
+</head>
+<body>
+<main>
+  <h1>Signing you in&hellip;</h1>
+  <p id="status">Relaying the authorization response back to the lopecode notebook that started this sign-in. You can close this tab.</p>
+</main>
+<script>
+(function () {
+  // atproto OAuth lands here with `code`, `state`, `iss` (success) or `error`,
+  // `error_description`, `state` (failure). This page is a stateless relay:
+  // forward the params to the opener via postMessage, then close.
+  //
+  // targetOrigin is "*" because the opener can be on any origin (file://, a
+  // GitHub Pages clone, a fork on a personal domain). The auth code is
+  // PKCE+DPoP-bound, so it can only be exchanged for tokens by the original
+  // requester that holds the matching code_verifier and DPoP private key.
+  // The opener verifies `event.origin === "https://lopecode.com"` on receipt.
+  var qs = new URLSearchParams(window.location.search);
+  var params = {};
+  qs.forEach(function (v, k) { params[k] = v; });
+
+  if (window.opener && !window.opener.closed) {
+    try {
+      window.opener.postMessage({ type: "lopecode-oauth-callback", params: params }, "*");
+    } catch (e) {}
+    setTimeout(function () { window.close(); }, 200);
+  } else {
+    var s = document.getElementById("status");
+    if (params.error) {
+      s.innerHTML = "Sign-in failed: <code>" + (params.error_description || params.error).replace(/[<>&"']/g, "") + "</code>";
+    } else {
+      s.textContent = "Lost the connection back to the lopecode notebook. Re-open the notebook and try again.";
+    }
+  }
+})();
+</script>
+</body>
+</html>
