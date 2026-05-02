@@ -7,17 +7,11 @@
   "scripts": {
     "build": "node build.mjs",
     "deploy": "npm run build && wrangler deploy",
-    "test:render": "node src/test-render.mjs",
-    "test:bundle": "npm run build && node src/test-real-bundle.mjs"
-  },
-  "dependencies": {
-    "@observablehq/runtime": "^6.0.0",
-    "@observablehq/stdlib": "^5.8.0",
-    "linkedom": "^0.18.0"
+    "test:render": "node src/test-render.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250124.0",
-    "esbuild": "^0.24.0",
+    "esbuild": "^0.24.2",
     "typescript": "^5.7.3",
     "wrangler": "^4.63.0"
   }
