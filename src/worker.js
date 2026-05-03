@@ -25,7 +25,7 @@ const APEX_HOSTS = new Set(["lopecode.com", "www.lopecode.com"]);
 const LEDGER_DID = "did:plc:j7nm3lrd5h7fm3sfhcv3lhfv";
 const LEDGER_RKEY = "3mkxe7vtnw32z";
 const LOPEFEED_DID = "did:plc:j7nm3lrd5h7fm3sfhcv3lhfv";
-const LOPEFEED_RKEY = "3mkxlndqmwx2e";
+const LOPEFEED_RKEY = "3mkxrk7yt4m2c";
 const PROFILE_PATH_RE = /^\/@[^\/?#]+\/?$/;
 
 async function proxyBundle(request, env, originalUrl, did, rkey) {
