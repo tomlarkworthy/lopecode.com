@@ -2,6 +2,10 @@
   "name": "lopecode-contrail",
   "main": "src/worker.ts",
   "compatibility_date": "2025-12-25",
+  // @atmo-dev/contrail's cursor encoder uses Node's Buffer
+  // (Buffer.from(..., 'base64url')); the listRecords XRPC route 500s
+  // with `ReferenceError: Buffer is not defined` without this flag.
+  "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
   "d1_databases": [
     {
