@@ -81,6 +81,40 @@ export default {
       if (!recordRes.ok) throw new Error(`getRecord ${recordRes.status}`);
       const record = (await recordRes.json()) as BundleRecord;
 
+      // ?file=<id> — return the decoded source of a single file as an
+      // attachment. Skips the full-bundle blob fetch.
+      const fileParam = url.searchParams.get("file");
+      if (fileParam !== null) {
+        const f = record.value.files.find(x => x.id === fileParam);
+        if (!f) return html404(`No file <code>${escapeAttr(fileParam)}</code> in bundle.`);
+        const blobRes = await fetch(
+          `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(f.blob.ref.$link)}`,
+          { cf: { cacheTtl: 31536000, cacheEverything: true } }
+        );
+        if (!blobRes.ok) throw new Error(`getBlob ${f.id}: ${blobRes.status}`);
+        const bytes = new Uint8Array(await blobRes.arrayBuffer());
+        let body: ArrayBuffer | Uint8Array;
+        if (f.encoding === "base64+gzip") {
+          // Blob bytes are utf-8 of a base64 string; the decoded base64
+          // is gzipped source. Decode → ungzip → original source bytes.
+          const b64 = new TextDecoder().decode(bytes);
+          const gz = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+          const stream = new Blob([gz]).stream().pipeThrough(new DecompressionStream("gzip"));
+          body = await new Response(stream).arrayBuffer();
+        } else {
+          // text → utf-8 source bytes; base64 → raw binary bytes.
+          body = bytes;
+        }
+        const safeName = fileParam.replace(/[^A-Za-z0-9._@-]+/g, "_");
+        return new Response(body, {
+          headers: {
+            "content-type": f.blob.mimeType,
+            "content-disposition": `attachment; filename="${safeName}"`,
+            "cache-control": "public, max-age=300"
+          }
+        });
+      }
+
       const blobs = new Map<string, Uint8Array>();
       await Promise.all(
         record.value.files.map(async f => {
@@ -100,12 +134,14 @@ export default {
 
       const html = await renderBundle({ record, blobs });
 
-      return new Response(html, {
-        headers: {
-          "content-type": "text/html; charset=utf-8",
-          "cache-control": "public, max-age=300"
-        }
-      });
+      const headers: Record<string, string> = {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "public, max-age=300"
+      };
+      if (url.searchParams.get("download") !== null) {
+        headers["content-disposition"] = `attachment; filename="${rkey}.html"`;
+      }
+      return new Response(html, { headers });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return html404(`Render failed: <code>${escapeAttr(msg)}</code>`);
