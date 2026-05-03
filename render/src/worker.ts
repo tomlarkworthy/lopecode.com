@@ -110,7 +110,8 @@ export default {
           headers: {
             "content-type": f.blob.mimeType,
             "content-disposition": `attachment; filename="${safeName}"`,
-            "cache-control": "public, max-age=300"
+            "cache-control": "public, max-age=300",
+            "access-control-allow-origin": "*"
           }
         });
       }
@@ -136,7 +137,8 @@ export default {
 
       const headers: Record<string, string> = {
         "content-type": "text/html; charset=utf-8",
-        "cache-control": "public, max-age=300"
+        "cache-control": "public, max-age=300",
+        "access-control-allow-origin": "*"
       };
       if (url.searchParams.get("download") !== null) {
         headers["content-disposition"] = `attachment; filename="${rkey}.html"`;
