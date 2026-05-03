@@ -23,51 +23,71 @@
 (function () {
   // atproto OAuth lands here with `code`, `state`, `iss` (success) or
   // `error`, `error_description`, `state` (failure). This page is a
-  // stateless relay: forward the params to the notebook via two paths,
-  // then close.
+  // stateless relay: route the params through the server-side relay so
+  // the notebook (which may live on file:// or any other origin) can
+  // poll for them. State is the 128-bit unguessable capability minted
+  // by the notebook; the auth code itself is PKCE+DPoP-bound, so even
+  // a leaked code can't be redeemed without the verifier/key.
   //
-  // 1. window.opener.postMessage — works when the popup chain preserved
-  //    its opener. Severed by strict Cross-Origin-Opener-Policy on the
-  //    auth server, which is common, so this is best-effort.
-  // 2. BroadcastChannel("lopecode-oauth") — same-origin to a hidden
-  //    `oauth/listener.html` iframe the notebook embeds. Survives COOP
-  //    severance because it relies on origin scoping rather than the
-  //    popup-opener relationship.
-  //
-  // The opener verifies origin / source / state nonce on receipt either
-  // way; the auth code is PKCE+DPoP-bound and can't be redeemed without
-  // the matching verifier and key, so duplicate delivery is harmless.
+  // We also try `window.opener.postMessage` and a same-origin
+  // `BroadcastChannel("lopecode-oauth")` as best-effort fast paths.
+  // Both are unreliable in practice — strict Cross-Origin-Opener-Policy
+  // on the auth server severs the opener, and Chrome's storage
+  // partitioning isolates a third-party iframe's BroadcastChannel from
+  // a top-level popup's. The server relay is the path that always works.
   var qs = new URLSearchParams(window.location.search);
   var params = {};
   qs.forEach(function (v, k) { params[k] = v; });
+  var state = params.state;
   var msg = { type: "lopecode-oauth-callback", params: params };
+  var statusEl = document.getElementById("status");
 
-  var deliveredOpener = false;
-  if (window.opener && !window.opener.closed) {
-    try {
+  // Best-effort fast paths.
+  try {
+    if (window.opener && !window.opener.closed) {
       window.opener.postMessage(msg, "*");
-      deliveredOpener = true;
-    } catch (e) {}
-  }
-
-  var deliveredChannel = false;
+    }
+  } catch (e) {}
   try {
     var ch = new BroadcastChannel("lopecode-oauth");
     ch.postMessage(msg);
-    deliveredChannel = true;
     setTimeout(function () { try { ch.close(); } catch (e) {} }, 250);
   } catch (e) {}
 
-  if (deliveredOpener || deliveredChannel) {
-    setTimeout(function () { window.close(); }, 250);
-  } else {
-    var s = document.getElementById("status");
-    if (params.error) {
-      s.innerHTML = "Sign-in failed: <code>" + (params.error_description || params.error).replace(/[<>&"']/g, "") + "</code>";
-    } else {
-      s.textContent = "Lost the connection back to the lopecode notebook. Re-open the notebook and try again.";
-    }
+  function showError(text) {
+    statusEl.textContent = text;
   }
+
+  if (!state || !/^[A-Za-z0-9_-]{16,128}$/.test(state)) {
+    if (params.error) {
+      showError("Sign-in failed: " + (params.error_description || params.error));
+    } else {
+      showError("OAuth callback missing state parameter — cannot relay safely.");
+    }
+    return;
+  }
+
+  // Authoritative path: POST the params to the server relay keyed by
+  // state. The notebook polls GET /oauth/relay/<state> and consumes the
+  // entry on first read.
+  fetch("/oauth/relay/" + encodeURIComponent(state), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(params),
+    credentials: "omit",
+    cache: "no-store"
+  }).then(function (res) {
+    if (!res.ok && res.status !== 204) {
+      throw new Error("relay " + res.status);
+    }
+    setTimeout(function () { try { window.close(); } catch (e) {} }, 200);
+  }).catch(function (err) {
+    if (params.error) {
+      showError("Sign-in failed: " + (params.error_description || params.error));
+    } else {
+      showError("Could not relay the result back to the notebook (" + err.message + "). Re-open the notebook and try again.");
+    }
+  });
 })();
 </script>
 </body>

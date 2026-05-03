@@ -20,6 +20,86 @@ const SIBLING_HOSTS = {
 // rest is alphanumeric. did:plc ids are base32 lower a-z 2-7.
 const SUBDOMAIN_RE = /^did-[a-z]+-[a-z0-9]+\.lopecode\.com$/i;
 
+// OAuth relay: short-lived store keyed by the OAuth `state` nonce. Used
+// to bridge the auth-server popup (top-level lopecode.com) back to the
+// notebook (file:// or other origin) — Chrome's storage partitioning
+// blocks BroadcastChannel between an iframe-of-lopecode.com inside a
+// file:// page and the top-level popup, so we mediate on the server.
+//
+// State is a 128-bit unguessable nonce minted by the notebook; possession
+// of state is the capability to read/write the slot. Auth codes routed
+// through here are PKCE+DPoP-bound — even if leaked, they can't be
+// redeemed without the verifier and DPoP private key, which never leave
+// the notebook.
+const OAUTH_RELAY_PREFIX = "/oauth/relay/";
+const OAUTH_RELAY_STATE_RE = /^[A-Za-z0-9_-]{16,128}$/;
+const OAUTH_RELAY_TTL = 300; // seconds
+const OAUTH_RELAY_MAX_BODY = 8192;
+
+function oauthRelayCors() {
+  return {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "content-type",
+    "access-control-max-age": "600",
+    "vary": "origin"
+  };
+}
+
+async function handleOAuthRelay(request, url) {
+  const state = decodeURIComponent(url.pathname.slice(OAUTH_RELAY_PREFIX.length));
+  if (!OAUTH_RELAY_STATE_RE.test(state)) {
+    return new Response("invalid state", { status: 400, headers: oauthRelayCors() });
+  }
+  const cache = caches.default;
+  // Internal-only key; the public path is /oauth/relay/<state>, but the
+  // cache is keyed by a synthetic URL so it can't be reached by external
+  // GET (which would bypass the delete-on-read semantics below).
+  const cacheKey = new Request(`https://lopecode-internal.invalid/__oauth_relay__/${state}`);
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: oauthRelayCors() });
+  }
+
+  if (request.method === "POST") {
+    const ct = request.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) {
+      return new Response("expected application/json", { status: 415, headers: oauthRelayCors() });
+    }
+    const body = await request.text();
+    if (body.length > OAUTH_RELAY_MAX_BODY) {
+      return new Response("payload too large", { status: 413, headers: oauthRelayCors() });
+    }
+    try { JSON.parse(body); } catch {
+      return new Response("invalid json", { status: 400, headers: oauthRelayCors() });
+    }
+    await cache.put(cacheKey, new Response(body, {
+      headers: {
+        "content-type": "application/json",
+        "cache-control": `public, max-age=${OAUTH_RELAY_TTL}`
+      }
+    }));
+    return new Response(null, { status: 204, headers: oauthRelayCors() });
+  }
+
+  if (request.method === "GET") {
+    const hit = await cache.match(cacheKey);
+    if (!hit) {
+      return new Response("", { status: 404, headers: oauthRelayCors() });
+    }
+    // Delete-on-read: the notebook is the only legitimate consumer; once
+    // it has the params, no one else should be able to fetch them again.
+    await cache.delete(cacheKey);
+    const body = await hit.text();
+    return new Response(body, {
+      status: 200,
+      headers: { "content-type": "application/json", ...oauthRelayCors() }
+    });
+  }
+
+  return new Response("method not allowed", { status: 405, headers: oauthRelayCors() });
+}
+
 function html404(message) {
   const body = `<!doctype html>
 <html lang="en"><head>
@@ -53,6 +133,9 @@ export default {
     const host = url.hostname.toLowerCase();
 
     if (APEX_HOSTS.has(host)) {
+      if (url.pathname.startsWith(OAUTH_RELAY_PREFIX)) {
+        return handleOAuthRelay(request, url);
+      }
       return env.ASSETS.fetch(request);
     }
 
