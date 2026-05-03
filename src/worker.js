@@ -19,19 +19,22 @@ const APEX_HOSTS = new Set(["lopecode.com", "www.lopecode.com"]);
 // location.pathname for the handle (in addition to ?handle= and
 // hashParams.handle).
 //
-// LEDGER_DID + LEDGER_RKEY pin the published bundle. Bumping the rkey
-// here promotes a new ledger build to the apex profile route.
+// LEDGER pins the published profile bundle (served at /@handle).
+// LOPEFEED pins the homepage discovery feed (served at /).
+// Bumping a rkey here promotes a new build to the apex route.
 const LEDGER_DID = "did:plc:j7nm3lrd5h7fm3sfhcv3lhfv";
 const LEDGER_RKEY = "3mkxe7vtnw32z";
+const LOPEFEED_DID = "did:plc:j7nm3lrd5h7fm3sfhcv3lhfv";
+const LOPEFEED_RKEY = "3mkxlndqmwx2e";
 const PROFILE_PATH_RE = /^\/@[^\/?#]+\/?$/;
 
-async function proxyLedger(request, env, originalUrl) {
+async function proxyBundle(request, env, originalUrl, did, rkey) {
   const renderUrl = new URL(originalUrl.toString());
-  renderUrl.hostname = `did-${LEDGER_DID.replace(/^did:/, "").replace(/:/g, "-")}.lopecode.com`;
-  renderUrl.pathname = `/r/${LEDGER_RKEY}`;
+  renderUrl.hostname = `did-${did.replace(/^did:/, "").replace(/:/g, "-")}.lopecode.com`;
+  renderUrl.pathname = `/r/${rkey}`;
   // Pass through to the render Worker; the response body is the
   // composed lopebook HTML — we relay it as-is so the URL bar keeps
-  // /@handle.
+  // its original path.
   const renderRequest = new Request(renderUrl.toString(), {
     method: request.method,
     headers: request.headers,
@@ -170,7 +173,10 @@ export default {
         return handleOAuthRelay(request, url);
       }
       if (PROFILE_PATH_RE.test(url.pathname)) {
-        return proxyLedger(request, env, url);
+        return proxyBundle(request, env, url, LEDGER_DID, LEDGER_RKEY);
+      }
+      if (url.pathname === "/" || url.pathname === "") {
+        return proxyBundle(request, env, url, LOPEFEED_DID, LOPEFEED_RKEY);
       }
       return env.ASSETS.fetch(request);
     }
