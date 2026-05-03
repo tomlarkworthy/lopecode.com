@@ -12,6 +12,39 @@
 
 const APEX_HOSTS = new Set(["lopecode.com", "www.lopecode.com"]);
 
+// Profile pages: /@handle on the apex serves the @lopecode/ledger
+// notebook bundle via the render Worker, so the address bar stays at
+// the clean lopecode.com/@handle URL while the page is the full
+// reactive Ledger experience. The ledger module reads
+// location.pathname for the handle (in addition to ?handle= and
+// hashParams.handle).
+//
+// LEDGER_DID + LEDGER_RKEY pin the published bundle. Bumping the rkey
+// here promotes a new ledger build to the apex profile route.
+const LEDGER_DID = "did:plc:j7nm3lrd5h7fm3sfhcv3lhfv";
+const LEDGER_RKEY = "3mkxe7vtnw32z";
+const PROFILE_PATH_RE = /^\/@[^\/?#]+\/?$/;
+
+async function proxyLedger(request, env, originalUrl) {
+  const renderUrl = new URL(originalUrl.toString());
+  renderUrl.hostname = `did-${LEDGER_DID.replace(/^did:/, "").replace(/:/g, "-")}.lopecode.com`;
+  renderUrl.pathname = `/r/${LEDGER_RKEY}`;
+  // Pass through to the render Worker; the response body is the
+  // composed lopebook HTML — we relay it as-is so the URL bar keeps
+  // /@handle.
+  const renderRequest = new Request(renderUrl.toString(), {
+    method: request.method,
+    headers: request.headers,
+    body: request.method === "GET" || request.method === "HEAD" ? null : await request.arrayBuffer()
+  });
+  const upstream = await env.RENDER.fetch(renderRequest);
+  // Clone headers so we can override cache-control without leaking the
+  // render Worker's headers verbatim (it sets max-age=300 which is fine
+  // but we may want to vary by URL eventually).
+  const headers = new Headers(upstream.headers);
+  return new Response(upstream.body, { status: upstream.status, headers });
+}
+
 const SIBLING_HOSTS = {
   "contrail.lopecode.com": "CONTRAIL"
 };
@@ -135,6 +168,9 @@ export default {
     if (APEX_HOSTS.has(host)) {
       if (url.pathname.startsWith(OAUTH_RELAY_PREFIX)) {
         return handleOAuthRelay(request, url);
+      }
+      if (PROFILE_PATH_RE.test(url.pathname)) {
+        return proxyLedger(request, env, url);
       }
       return env.ASSETS.fetch(request);
     }

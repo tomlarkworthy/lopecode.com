@@ -1,7 +1,6 @@
-# Profile pages: /@handle is rewritten to /profile (no .html suffix
-# so Workers Static Assets' auto html_handling doesn't 307 it back).
-# The page reads location.pathname for the handle.
-/@*    /profile  200
+# /@:handle is now handled by the apex Worker — it proxies through to
+# the @lopecode/ledger notebook bundle (LEDGER_RKEY in src/worker.js)
+# via the render Worker, keeping the URL bar at lopecode.com/@:handle.
 
 # Stable shortlink to the atproto integration spec.
 /spec  https://github.com/tomlarkworthy/lopecode-dev/blob/main/specs/atproto.md  302
