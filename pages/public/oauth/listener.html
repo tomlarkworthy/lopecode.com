@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>OAuth listener &middot; lopecode.com</title>
+<style>html,body{margin:0;padding:0;width:100%;height:100%;background:transparent}</style>
+</head>
+<body>
+<script>
+(function () {
+  // OAuth bridge iframe. The atproto OAuth flow opens a popup that
+  // navigates through the user's PDS auth server before landing back on
+  // lopecode.com/oauth/callback. Strict Cross-Origin-Opener-Policy on
+  // the auth server (or anywhere along the redirect chain) severs the
+  // popup's `window.opener`, so callback.html can't postMessage back to
+  // a file:// or cross-origin notebook directly.
+  //
+  // This iframe sits inside the notebook on the lopecode.com origin.
+  // callback.html broadcasts the OAuth result over a same-origin
+  // `BroadcastChannel`; we receive it here and forward to the parent
+  // window via standard iframe→parent postMessage, which always works
+  // regardless of opener state.
+  //
+  // Security: parent verifies `event.origin === "https://lopecode.com"`
+  // AND `event.source === iframe.contentWindow` AND the embedded `state`
+  // nonce matches what the notebook generated for this flow.
+  var ch = new BroadcastChannel("lopecode-oauth");
+  ch.onmessage = function (ev) {
+    var msg = ev && ev.data;
+    if (!msg || msg.type !== "lopecode-oauth-callback") return;
+    // targetOrigin "*" is safe here — only the parent that embedded
+    // this iframe is reachable, and it does its own origin/source/state
+    // verification on receipt.
+    parent.postMessage(msg, "*");
+  };
+  // Tell the parent we're ready, so it can close any race window where
+  // the callback fires before the iframe finishes loading.
+  parent.postMessage({ type: "lopecode-oauth-listener-ready" }, "*");
+})();
+</script>
+</body>
+</html>

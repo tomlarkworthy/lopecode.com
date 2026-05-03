@@ -21,24 +21,45 @@
 </main>
 <script>
 (function () {
-  // atproto OAuth lands here with `code`, `state`, `iss` (success) or `error`,
-  // `error_description`, `state` (failure). This page is a stateless relay:
-  // forward the params to the opener via postMessage, then close.
+  // atproto OAuth lands here with `code`, `state`, `iss` (success) or
+  // `error`, `error_description`, `state` (failure). This page is a
+  // stateless relay: forward the params to the notebook via two paths,
+  // then close.
   //
-  // targetOrigin is "*" because the opener can be on any origin (file://, a
-  // GitHub Pages clone, a fork on a personal domain). The auth code is
-  // PKCE+DPoP-bound, so it can only be exchanged for tokens by the original
-  // requester that holds the matching code_verifier and DPoP private key.
-  // The opener verifies `event.origin === "https://lopecode.com"` on receipt.
+  // 1. window.opener.postMessage — works when the popup chain preserved
+  //    its opener. Severed by strict Cross-Origin-Opener-Policy on the
+  //    auth server, which is common, so this is best-effort.
+  // 2. BroadcastChannel("lopecode-oauth") — same-origin to a hidden
+  //    `oauth/listener.html` iframe the notebook embeds. Survives COOP
+  //    severance because it relies on origin scoping rather than the
+  //    popup-opener relationship.
+  //
+  // The opener verifies origin / source / state nonce on receipt either
+  // way; the auth code is PKCE+DPoP-bound and can't be redeemed without
+  // the matching verifier and key, so duplicate delivery is harmless.
   var qs = new URLSearchParams(window.location.search);
   var params = {};
   qs.forEach(function (v, k) { params[k] = v; });
+  var msg = { type: "lopecode-oauth-callback", params: params };
 
+  var deliveredOpener = false;
   if (window.opener && !window.opener.closed) {
     try {
-      window.opener.postMessage({ type: "lopecode-oauth-callback", params: params }, "*");
+      window.opener.postMessage(msg, "*");
+      deliveredOpener = true;
     } catch (e) {}
-    setTimeout(function () { window.close(); }, 200);
+  }
+
+  var deliveredChannel = false;
+  try {
+    var ch = new BroadcastChannel("lopecode-oauth");
+    ch.postMessage(msg);
+    deliveredChannel = true;
+    setTimeout(function () { try { ch.close(); } catch (e) {} }, 250);
+  } catch (e) {}
+
+  if (deliveredOpener || deliveredChannel) {
+    setTimeout(function () { window.close(); }, 250);
   } else {
     var s = document.getElementById("status");
     if (params.error) {
