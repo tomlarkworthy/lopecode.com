@@ -49,7 +49,8 @@ async function proxyBundle(request, env, originalUrl, did, rkey) {
 }
 
 const SIBLING_HOSTS = {
-  "contrail.lopecode.com": "CONTRAIL"
+  "contrail.lopecode.com": "CONTRAIL",
+  "feed.lopecode.com": "FEED"
 };
 
 // did-{method}-{rest}.lopecode.com — method is alpha (plc / web / key),

@@ -1,0 +1,12 @@
+{
+  "name": "lopecode-feed",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-12-25",
+  "observability": { "enabled": true },
+  "services": [
+    { "binding": "CONTRAIL", "service": "lopecode-contrail" }
+  ]
+  // Reached via service binding from the apex `lopecode` Worker
+  // (feed.lopecode.com → FEED). No routes / Custom Domains — apex's
+  // wildcard *.lopecode.com claims the host and forwards by SIBLING_HOSTS.
+}

@@ -29,6 +29,7 @@
 
   "services": [
     { "binding": "CONTRAIL", "service": "lopecode-contrail" },
-    { "binding": "RENDER", "service": "lopecode-render" }
+    { "binding": "RENDER", "service": "lopecode-render" },
+    { "binding": "FEED", "service": "lopecode-feed" }
   ]
 }

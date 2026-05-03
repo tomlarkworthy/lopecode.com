@@ -1,0 +1,15 @@
+{
+  "name": "lopecode-feed",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "app.bsky.feed.generator Worker: Bluesky-side discovery feed for com.lopecode.bundle. Skeletons of recent companion-bsky posts, derived from the bundle/post shared-rkey convention.",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250124.0",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.63.0"
+  }
+}
