@@ -87,6 +87,20 @@ export default {
       if (fileParam !== null) {
         const f = record.value.files.find(x => x.id === fileParam);
         if (!f) return html404(`No file <code>${escapeAttr(fileParam)}</code> in bundle.`);
+        // ETag = the file's blob CID (content-addressed → bytes-equal iff
+        // CID-equal). The slug-rkey publish flow means /r/{rkey}?file=…
+        // has a stable URL across republishes, so we revalidate by CID.
+        const fileEtag = `"${f.blob.ref.$link}"`;
+        if (request.headers.get("if-none-match") === fileEtag) {
+          return new Response(null, {
+            status: 304,
+            headers: {
+              "etag": fileEtag,
+              "cache-control": "public, max-age=0, must-revalidate",
+              "access-control-allow-origin": "*"
+            }
+          });
+        }
         const blobRes = await fetch(
           `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(f.blob.ref.$link)}`,
           { cf: { cacheTtl: 31536000, cacheEverything: true } }
@@ -110,7 +124,24 @@ export default {
           headers: {
             "content-type": f.blob.mimeType,
             "content-disposition": `attachment; filename="${safeName}"`,
-            "cache-control": "public, max-age=300",
+            "etag": fileEtag,
+            "cache-control": "public, max-age=0, must-revalidate",
+            "access-control-allow-origin": "*"
+          }
+        });
+      }
+
+      // ETag = the bundle record's CID. Stable URL (slug rkey) + content-
+      // addressed CID lets us serve 304 from a cheap getRecord call when
+      // the bundle hasn't changed. Without this, max-age would either let
+      // republishes go stale or force a full re-render every hit.
+      const recordEtag = `"${record.cid}"`;
+      if (request.headers.get("if-none-match") === recordEtag) {
+        return new Response(null, {
+          status: 304,
+          headers: {
+            "etag": recordEtag,
+            "cache-control": "public, max-age=0, must-revalidate",
             "access-control-allow-origin": "*"
           }
         });
@@ -137,7 +168,8 @@ export default {
 
       const headers: Record<string, string> = {
         "content-type": "text/html; charset=utf-8",
-        "cache-control": "public, max-age=300",
+        "etag": recordEtag,
+        "cache-control": "public, max-age=0, must-revalidate",
         "access-control-allow-origin": "*"
       };
       if (url.searchParams.get("download") !== null) {
