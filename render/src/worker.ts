@@ -7,6 +7,13 @@
 
 import { renderBundle } from "./render.mjs";
 
+// Bump this whenever rendering logic changes (e.g. when we add or modify
+// what gets injected into the HTML). Combined with the bundle CID in the
+// ETag, this guarantees that a redeploy invalidates every edge-cached
+// response — otherwise CF would keep serving the pre-deploy HTML for any
+// path whose bundle CID hasn't changed.
+const RENDER_VERSION = "v2-stdlink";
+
 const SUBDOMAIN_RE = /^did-([a-z]+)-([a-z0-9]+)\.lopecode\.com$/i;
 const RKEY_RE = /^\/r\/([A-Za-z0-9._~-]+)\/?$/;
 
@@ -135,7 +142,7 @@ export default {
       // addressed CID lets us serve 304 from a cheap getRecord call when
       // the bundle hasn't changed. Without this, max-age would either let
       // republishes go stale or force a full re-render every hit.
-      const recordEtag = `"${record.cid}"`;
+      const recordEtag = `"${record.cid}.${RENDER_VERSION}"`;
       if (request.headers.get("if-none-match") === recordEtag) {
         return new Response(null, {
           status: 304,
