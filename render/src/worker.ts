@@ -164,7 +164,21 @@ export default {
         })
       );
 
-      const html = await renderBundle({ record, blobs });
+      const rawHtml = await renderBundle({ record, blobs });
+
+      // standard.site verification: inject a <link rel="site.standard.document">
+      // pointing at the AT-URI of the bundle's `site.standard.document` record
+      // (sibling of the bundle, same rkey). Indexers crawl this tag to confirm
+      // the published HTML really belongs to the claimed AT-URI; lopecode owns
+      // the rendering path so we inject unconditionally — if the user hasn't
+      // written the document record yet, the indexer simply 404s on resolve
+      // and nothing else breaks. Idempotent: if the bundle already includes
+      // the link (e.g. baked at build time), we don't double-insert.
+      const stdDocAtUri = `at://${did}/site.standard.document/${rkey}`;
+      const stdLinkTag = `<link rel="site.standard.document" href="${escapeAttr(stdDocAtUri)}">`;
+      const html = rawHtml.includes('rel="site.standard.document"')
+        ? rawHtml
+        : rawHtml.replace(/<\/head>/i, `${stdLinkTag}</head>`);
 
       const headers: Record<string, string> = {
         "content-type": "text/html; charset=utf-8",

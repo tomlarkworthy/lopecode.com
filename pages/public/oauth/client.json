@@ -5,7 +5,7 @@
   "redirect_uris": ["https://lopecode.com/oauth/callback"],
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
-  "scope": "atproto repo:com.lopecode.bundle repo:com.lopecode.bundle.crossRef repo:com.lopecode.bundle.version blob:*/* repo:app.bsky.feed.post",
+  "scope": "atproto repo:com.lopecode.bundle repo:com.lopecode.bundle.crossRef repo:com.lopecode.bundle.version blob:*/* repo:app.bsky.feed.post repo:site.standard.publication repo:site.standard.document",
   "application_type": "web",
   "token_endpoint_auth_method": "none",
   "dpop_bound_access_tokens": true

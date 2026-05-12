@@ -57,6 +57,37 @@ const SIBLING_HOSTS = {
 // rest is alphanumeric. did:plc ids are base32 lower a-z 2-7.
 const SUBDOMAIN_RE = /^did-[a-z]+-[a-z0-9]+\.lopecode\.com$/i;
 
+// Reverse the subdomain encoding used by proxyBundle: a did `did:plc:abc`
+// is encoded as `did-plc-abc.lopecode.com`. For SUBDOMAIN_RE-matching
+// hosts, the first hyphen-separated segment after the `did-` prefix is the
+// method, the remainder is the method-specific identifier.
+function subdomainToDid(host) {
+  const m = host.toLowerCase().match(/^did-([a-z]+)-([a-z0-9]+)\.lopecode\.com$/i);
+  if (!m) return null;
+  return `did:${m[1]}:${m[2]}`;
+}
+
+// standard.site verification endpoint. Per spec, the body is a single
+// AT-URI in text/plain pointing at the user's `site.standard.publication`
+// record (singleton at rkey=self). Indexers fetch this from each
+// publication's declared `url` to confirm the hosting really represents
+// the claimed publication. We serve it for every DID-subdomain host
+// before forwarding the rest of the path to the render Worker.
+function handleStandardSiteWellKnown(host) {
+  const did = subdomainToDid(host);
+  if (!did) {
+    return new Response("unknown host", { status: 404 });
+  }
+  return new Response(`at://${did}/site.standard.publication/self\n`, {
+    status: 200,
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "public, max-age=300",
+      "access-control-allow-origin": "*"
+    }
+  });
+}
+
 // OAuth relay: short-lived store keyed by the OAuth `state` nonce. Used
 // to bridge the auth-server popup (top-level lopecode.com) back to the
 // notebook (file:// or other origin) — Chrome's storage partitioning
@@ -188,6 +219,9 @@ export default {
     }
 
     if (SUBDOMAIN_RE.test(host)) {
+      if (url.pathname === "/.well-known/site.standard.publication") {
+        return handleStandardSiteWellKnown(host);
+      }
       return env.RENDER.fetch(request);
     }
 
