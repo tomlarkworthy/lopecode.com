@@ -15,6 +15,37 @@ const RKEY_RE = /^\/r\/([A-Za-z0-9._~-]+)\/?$/;
 // fetches go upstream and re-populate.
 const BLOB_CACHE_VERSION = "v1";
 
+// Fetch the bundle record for a (did, rkey) pair, with a short-lived
+// edge cache and one retry on failure. Bursts of N concurrent renders
+// for the same record otherwise produce N parallel getRecord calls
+// against the PDS, which sometimes returns 4xx. The cache collapses
+// the burst to one upstream call; the retry handles cold-cache misses
+// that race with PDS hiccups. TTL is short (60s) so republishes
+// propagate within a minute.
+async function fetchRecord(pds: string, did: string, rkey: string): Promise<BundleRecord> {
+  const cacheKey = new Request(
+    `https://lopecode-render.invalid/record/${BLOB_CACHE_VERSION}/${encodeURIComponent(did)}/${encodeURIComponent(rkey)}`
+  );
+  const cached = await caches.default.match(cacheKey);
+  if (cached) return (await cached.json()) as BundleRecord;
+
+  const url = `${pds}/xrpc/com.atproto.repo.getRecord?repo=${encodeURIComponent(did)}&collection=com.lopecode.bundle&rkey=${encodeURIComponent(rkey)}`;
+  let r = await fetch(url);
+  if (!r.ok) r = await fetch(url);
+  if (!r.ok) {
+    const body = await r.text().catch(() => "");
+    throw new Error(`getRecord ${r.status} body=${body.slice(0, 200)}`);
+  }
+  const text = await r.text();
+  await caches.default.put(cacheKey, new Response(text, {
+    headers: {
+      "cache-control": "public, max-age=60",
+      "content-type": "application/json"
+    }
+  }));
+  return JSON.parse(text) as BundleRecord;
+}
+
 // Fetch a single atproto blob by CID, with edge caching via the Cache
 // API. CIDs are content-addressed (immutable bytes), so blobs share
 // across DIDs and bundles — system files like es-module-shims appear
@@ -110,11 +141,7 @@ export default {
 
     try {
       const pds = await resolvePds(did);
-      const recordRes = await fetch(
-        `${pds}/xrpc/com.atproto.repo.getRecord?repo=${encodeURIComponent(did)}&collection=com.lopecode.bundle&rkey=${encodeURIComponent(rkey)}`
-      );
-      if (!recordRes.ok) throw new Error(`getRecord ${recordRes.status}`);
-      const record = (await recordRes.json()) as BundleRecord;
+      const record = await fetchRecord(pds, did, rkey);
 
       // ?file=<id> — return the decoded source of a single file as an
       // attachment. Skips the full-bundle blob fetch.
