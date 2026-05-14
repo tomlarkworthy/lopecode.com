@@ -15,7 +15,7 @@ const RKEY_RE = /^\/r\/([A-Za-z0-9._~-]+)\/?$/;
 // third-party-host subrequest entries. When poisoned 4xx entries get
 // stuck (cf. earlier `cacheTtl: 31536000, cacheEverything: true` bug),
 // bumping this is the in-band way to bust them.
-const BLOB_CACHE_BUST = "1";
+const BLOB_CACHE_BUST = "2";
 
 interface FileEntry {
   id: string;
