@@ -103,7 +103,12 @@ export default {
         }
         const blobRes = await fetch(
           `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(f.blob.ref.$link)}`,
-          { cf: { cacheTtl: 31536000, cacheEverything: true } }
+          {
+            cf: {
+              cacheEverything: true,
+              cacheTtlByStatus: { "200-299": 31536000, "400-499": 0, "500-599": 0 }
+            }
+          }
         );
         if (!blobRes.ok) throw new Error(`getBlob ${f.id}: ${blobRes.status}`);
         const bytes = new Uint8Array(await blobRes.arrayBuffer());
@@ -157,7 +162,12 @@ export default {
           // warms cross-bundle.
           const r = await fetch(
             `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(f.blob.ref.$link)}`,
-            { cf: { cacheTtl: 31536000, cacheEverything: true } }
+            {
+              cf: {
+                cacheEverything: true,
+                cacheTtlByStatus: { "200-299": 31536000, "400-499": 0, "500-599": 0 }
+              }
+            }
           );
           if (!r.ok) throw new Error(`getBlob ${f.id}: ${r.status}`);
           blobs.set(f.id, new Uint8Array(await r.arrayBuffer()));
