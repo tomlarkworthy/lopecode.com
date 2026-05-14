@@ -10,6 +10,13 @@ import { renderBundle } from "./render.mjs";
 const SUBDOMAIN_RE = /^did-([a-z]+)-([a-z0-9]+)\.lopecode\.com$/i;
 const RKEY_RE = /^\/r\/([A-Za-z0-9._~-]+)\/?$/;
 
+// Bump to force a cache-key change on the upstream getBlob subrequest.
+// Workers fetch caches by URL; CF dashboard purges don't reliably hit
+// third-party-host subrequest entries. When poisoned 4xx entries get
+// stuck (cf. earlier `cacheTtl: 31536000, cacheEverything: true` bug),
+// bumping this is the in-band way to bust them.
+const BLOB_CACHE_BUST = "1";
+
 interface FileEntry {
   id: string;
   encoding: "text" | "base64" | "base64+gzip";
@@ -102,7 +109,7 @@ export default {
           });
         }
         const blobRes = await fetch(
-          `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(f.blob.ref.$link)}`,
+          `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(f.blob.ref.$link)}&_cb=${BLOB_CACHE_BUST}`,
           {
             cf: {
               cacheEverything: true,
@@ -161,7 +168,7 @@ export default {
           // inspector) share CIDs across every bundle, so this also
           // warms cross-bundle.
           const r = await fetch(
-            `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(f.blob.ref.$link)}`,
+            `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(f.blob.ref.$link)}&_cb=${BLOB_CACHE_BUST}`,
             {
               cf: {
                 cacheEverything: true,
