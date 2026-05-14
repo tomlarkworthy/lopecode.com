@@ -10,12 +10,40 @@ import { renderBundle } from "./render.mjs";
 const SUBDOMAIN_RE = /^did-([a-z]+)-([a-z0-9]+)\.lopecode\.com$/i;
 const RKEY_RE = /^\/r\/([A-Za-z0-9._~-]+)\/?$/;
 
-// Bump to force a cache-key change on the upstream getBlob subrequest.
-// Workers fetch caches by URL; CF dashboard purges don't reliably hit
-// third-party-host subrequest entries. When poisoned 4xx entries get
-// stuck (cf. earlier `cacheTtl: 31536000, cacheEverything: true` bug),
-// bumping this is the in-band way to bust them.
-const BLOB_CACHE_BUST = "3";
+// Bump to invalidate every cached blob. Used as a path segment in the
+// caches.default cache key — bumping changes the key, so the next
+// fetches go upstream and re-populate.
+const BLOB_CACHE_VERSION = "v1";
+
+// Fetch a single atproto blob by CID, with edge caching via the Cache
+// API. CIDs are content-addressed (immutable bytes), so blobs share
+// across DIDs and bundles — system files like es-module-shims appear
+// in every bundle under the same CID and are served from cache after
+// the first hit per colo. We only `cache.put` 200 responses, so 4xx
+// can never poison the entry. One retry on failure handles transient
+// PDS drops.
+async function fetchBlob(pds: string, did: string, cid: string): Promise<Uint8Array> {
+  const cacheKey = new Request(`https://lopecode-render.invalid/blob/${BLOB_CACHE_VERSION}/${cid}`);
+  const cached = await caches.default.match(cacheKey);
+  if (cached) return new Uint8Array(await cached.arrayBuffer());
+
+  const url = `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(cid)}`;
+  let r = await fetch(url);
+  if (!r.ok) r = await fetch(url);
+  if (!r.ok) {
+    const body = await r.text().catch(() => "");
+    throw new Error(`getBlob cid=${cid} status=${r.status} body=${body.slice(0, 200)}`);
+  }
+
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  await caches.default.put(cacheKey, new Response(bytes, {
+    headers: {
+      "cache-control": "public, max-age=31536000, immutable",
+      "content-type": "application/octet-stream"
+    }
+  }));
+  return bytes;
+}
 
 interface FileEntry {
   id: string;
@@ -108,16 +136,7 @@ export default {
             }
           });
         }
-        const blobRes = await fetch(
-          `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(f.blob.ref.$link)}&_cb=${BLOB_CACHE_BUST}`,
-          {
-            cf: {
-              cacheTtlByStatus: { "200-299": 31536000, "400-499": 0, "500-599": 0 }
-            }
-          }
-        );
-        if (!blobRes.ok) throw new Error(`getBlob ${f.id}: ${blobRes.status}`);
-        const bytes = new Uint8Array(await blobRes.arrayBuffer());
+        const bytes = await fetchBlob(pds, did, f.blob.ref.$link);
         let body: ArrayBuffer | Uint8Array;
         if (f.encoding === "base64+gzip") {
           // Blob bytes are utf-8 of a base64 string; the decoded base64
@@ -161,21 +180,7 @@ export default {
       const blobs = new Map<string, Uint8Array>();
       await Promise.all(
         record.value.files.map(async f => {
-          // atproto blobs are content-addressed by CID — bytes are
-          // immutable forever, so the CF edge cache can hold them
-          // indefinitely. System modules (es-module-shims, runtime,
-          // inspector) share CIDs across every bundle, so this also
-          // warms cross-bundle.
-          const r = await fetch(
-            `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(f.blob.ref.$link)}&_cb=${BLOB_CACHE_BUST}`,
-            {
-              cf: {
-                cacheTtlByStatus: { "200-299": 31536000, "400-499": 0, "500-599": 0 }
-              }
-            }
-          );
-          if (!r.ok) throw new Error(`getBlob ${f.id}: ${r.status}`);
-          blobs.set(f.id, new Uint8Array(await r.arrayBuffer()));
+          blobs.set(f.id, await fetchBlob(pds, did, f.blob.ref.$link));
         })
       );
 
