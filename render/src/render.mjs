@@ -110,7 +110,7 @@ const DEFAULT_BOOTLOADER = "@tomlarkworthy/bootloader";
 const DISK_DATA_URL =
   "data:image/svg+xml;base64,PHN2ZyBmaWxsPSJ3aGl0ZSIgd2lkdGg9IjUwcHgiIGhlaWdodD0iNTBweCIgdmlld0JveD0iMCAwIDY0IDY0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IGhlaWdodD0iNCIgd2lkdGg9IjQiIHg9IjIwIiB5PSI1MCIvPjxyZWN0IGhlaWdodD0iNCIgd2lkdGg9IjE2IiB4PSIyOCIgeT0iNTAiLz48cGF0aCBkPSJNMzIsMzhhOCw4LDAsMSwwLTgtOEE4LjAwOSw4LjAwOSwwLDAsMCwzMiwzOFptMC0xMmE0LDQsMCwxLDEtNCw0QTQsNCwwLDAsMSwzMiwyNloiLz48cGF0aCBkPSJNNiw2Mkg1OGEyLDIsMCwwLDAsMi0yVjE1YTIsMiwwLDAsMC0uNTg2LTEuNDE0bC0xMS0xMUEyLDIsMCwwLDAsNDcsMkg2QTIsMiwwLDAsMCw0LDRWNjBBMiwyLDAsMCwwLDYsNjJabTQyLTRIMTZWNDZINDhaTTE2LDZIMzF2NGg0VjZoNHY4SDE2Wk04LDZoNFYxNmEyLDIsMCwwLDAsMiwySDQxYTIsMiwwLDAsMCwyLTJWNmgzLjE3Mkw1NiwxNS44MjlWNThINTJWNDRhMiwyLDAsMCwwLTItMkgxNGEyLDIsMCwwLDAtMiwyVjU4SDhaIi8+PC9zdmc+";
 
-export async function renderBundle({ record, blobs }) {
+export async function renderBundle({ record, blobs, coverUrl }) {
   const valueOf = makeResolver({ diskDataUrl: DISK_DATA_URL });
   const lopebook = await valueOf("lopebook");
 
@@ -135,7 +135,9 @@ ${escapeScriptTags(text)}
     blocks,
     cssUrls,
     bootloader: DEFAULT_BOOTLOADER,
-    title: record.value.title || "Lopecode notebook"
+    title: record.value.title || "Lopecode notebook",
+    description: record.value.description,
+    image: coverUrl
   });
 }
 

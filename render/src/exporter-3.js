@@ -1517,15 +1517,25 @@ const _1pcnq22 = function _networking_script(normalize,isNotebook){return(
   })();`
 )};
 const _1crzwh0 = function _lopebook(diskDataUrl,networking_script){return(
-({blocks = '', cssUrls = [], bootloader = '@tomlarkworthy/bootloader', title = 'Lopecode notebook', head} = {}) => {
+({blocks = '', cssUrls = [], bootloader = '@tomlarkworthy/bootloader', title = 'Lopecode notebook', description, image, head} = {}) => {
     const styleImports = cssUrls.map((url, i) => `  const style${ i } = await importShim(${ JSON.stringify(url) }, { with: { type: 'css' } });`).join('\n');
     const styleAdopt = cssUrls.map((_, i) => `style${ i }.default`).join(',');
+    // Link-preview meta; image is typically a data: URL (self-contained file).
+    const attr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const ogTags = [
+        `<meta property="og:title" content="${ attr(title) }">`,
+        `<meta property="og:type" content="website">`,
+        description ? `<meta name="description" content="${ attr(description) }">` : '',
+        description ? `<meta property="og:description" content="${ attr(description) }">` : '',
+        image ? `<meta property="og:image" content="${ attr(image) }">` : ''
+    ].filter(Boolean).join('\n  ');
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>${ title }</title>
+  ${ ogTags }
   ${ head ? head : `<link rel="icon" href="${ diskDataUrl }">` }
 </head>
 <body>

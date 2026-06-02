@@ -85,7 +85,14 @@ interface FileEntry {
 interface BundleRecord {
   uri: string;
   cid: string;
-  value: { title?: string; files: FileEntry[]; createdAt: string };
+  value: {
+    title?: string;
+    description?: string;
+    coverImage?: { ref: { $link: string }; mimeType: string; size: number };
+    stdDocUri?: string;
+    files: FileEntry[];
+    createdAt: string;
+  };
 }
 
 async function resolvePds(did: string): Promise<string> {
@@ -211,21 +218,27 @@ export default {
         })
       );
 
-      const rawHtml = await renderBundle({ record, blobs });
+      // og:image points at the PDS-served cover blob (a record field, not a
+      // bundle file). Public, content-addressed, cacheable — fine for scrapers.
+      const coverCid = record.value.coverImage?.ref?.$link;
+      const coverUrl = coverCid
+        ? `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(coverCid)}`
+        : undefined;
+
+      const rawHtml = await renderBundle({ record, blobs, coverUrl });
 
       // standard.site verification: inject a <link rel="site.standard.document">
-      // pointing at the AT-URI of the bundle's `site.standard.document` record
-      // (sibling of the bundle, same rkey). Indexers crawl this tag to confirm
-      // the published HTML really belongs to the claimed AT-URI; lopecode owns
-      // the rendering path so we inject unconditionally — if the user hasn't
-      // written the document record yet, the indexer simply 404s on resolve
-      // and nothing else breaks. Idempotent: if the bundle already includes
-      // the link (e.g. baked at build time), we don't double-insert.
-      const stdDocAtUri = `at://${did}/site.standard.document/${rkey}`;
-      const stdLinkTag = `<link rel="site.standard.document" href="${escapeAttr(stdDocAtUri)}">`;
-      const html = rawHtml.includes('rel="site.standard.document"')
-        ? rawHtml
-        : rawHtml.replace(/<\/head>/i, `${stdLinkTag}</head>`);
+      // pointing at the AT-URI of the bundle's site.standard.document. The doc is
+      // key:tid, so its rkey is a server-minted TID (not the bundle slug) — we
+      // read the exact AT-URI the publisher stored on the record (`stdDocUri`).
+      // Indexers crawl this tag to confirm the published HTML belongs to the
+      // claimed AT-URI. Only inject when we have a URI (older bundles without one
+      // are skipped); idempotent if the link is already baked in.
+      const stdDocAtUri = record.value.stdDocUri;
+      const html = stdDocAtUri && !rawHtml.includes('rel="site.standard.document"')
+        ? rawHtml.replace(/<\/head>/i,
+            `<link rel="site.standard.document" href="${escapeAttr(stdDocAtUri)}"></head>`)
+        : rawHtml;
 
       const headers: Record<string, string> = {
         "content-type": "text/html; charset=utf-8",
