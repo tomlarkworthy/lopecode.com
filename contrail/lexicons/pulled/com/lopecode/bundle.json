@@ -14,7 +14,28 @@
             "type": "array",
             "items": { "type": "ref", "ref": "#fileEntry" }
           },
-          "createdAt": { "type": "string", "format": "datetime" }
+          "createdAt": { "type": "string", "format": "datetime" },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Card summary. Canonical home is the HTML head (og:description); copied onto the record at publish so Contrail indexes it without parsing HTML."
+          },
+          "coverImage": {
+            "type": "blob",
+            "accept": ["image/*"],
+            "maxSize": 1000000,
+            "description": "Card thumbnail (<1MB), NOT a bundle file. at-write fetches the og:image bytes (data: URL or external URL) at publish and uploadBlobs them. Reused as site.standard.document.coverImage and the bsky embed thumb; the render Worker serves it for og:image."
+          },
+          "bskyPostUri": {
+            "type": "string",
+            "format": "at-uri",
+            "description": "Companion app.bsky.feed.post written by Share (TID rkey, since app.bsky.feed.post is key:tid). Set on first Share; persists across republishes so re-Share overwrites the same post."
+          },
+          "stdDocUri": {
+            "type": "string",
+            "format": "at-uri",
+            "description": "This bundle's site.standard.document (key:tid, so the rkey is a server-minted TID not derivable from the slug). Set on first publish; persists across republishes so the same document is overwritten. The render Worker reads it for the <link rel=\"site.standard.document\"> tag."
+          }
         }
       }
     },
