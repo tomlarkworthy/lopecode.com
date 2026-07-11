@@ -227,17 +227,36 @@ export default {
 
       const rawHtml = await renderBundle({ record, blobs, coverUrl });
 
-      // standard.site verification: inject a <link rel="site.standard.document">
-      // pointing at the AT-URI of the bundle's site.standard.document. The doc is
-      // key:tid, so its rkey is a server-minted TID (not the bundle slug) — we
-      // read the exact AT-URI the publisher stored on the record (`stdDocUri`).
-      // Indexers crawl this tag to confirm the published HTML belongs to the
-      // claimed AT-URI. Only inject when we have a URI (older bundles without one
-      // are skipped); idempotent if the link is already baked in.
+      // Inject AT-Protocol discovery metadata into <head> so crawlers/indexers
+      // can map this served page back to its canonical AT records + identity.
+      // Two overlapping conventions, both idempotent (skip whatever the exported
+      // HTML already baked in):
+      //  - <link rel="site.standard.document">: standard.site verification. Bluesky
+      //    unfurls a rich link card from it. The doc is key:tid, so its rkey is a
+      //    server-minted TID (not the bundle slug) — we use the exact AT-URI the
+      //    publisher stored on the record (`stdDocUri`). Older bundles lack one.
+      //  - <meta property="at:*">: Chris Shank's at-tags proposal (mapping web
+      //    pages to canonical AT records). canonical = the com.lopecode.bundle
+      //    record (the runnable artifact itself); author/me = the bare author DID;
+      //    when a standard.site sidecar exists it's an alternate + the publication.
       const stdDocAtUri = record.value.stdDocUri;
-      const html = stdDocAtUri && !rawHtml.includes('rel="site.standard.document"')
-        ? rawHtml.replace(/<\/head>/i,
-            `<link rel="site.standard.document" href="${escapeAttr(stdDocAtUri)}"></head>`)
+      const bundleAtUri = `at://${did}/com.lopecode.bundle/${rkey}`;
+      const meAtUri = `at://${did}`;
+      const inject: string[] = [];
+      if (stdDocAtUri && !rawHtml.includes('rel="site.standard.document"')) {
+        inject.push(`<link rel="site.standard.document" href="${escapeAttr(stdDocAtUri)}">`);
+      }
+      if (!rawHtml.includes('property="at:canonical"')) {
+        inject.push(`<meta property="at:canonical" content="${escapeAttr(bundleAtUri)}">`);
+        inject.push(`<meta property="at:author" content="${escapeAttr(meAtUri)}">`);
+        inject.push(`<meta property="at:me" content="${escapeAttr(meAtUri)}">`);
+        if (stdDocAtUri) {
+          inject.push(`<meta property="at:alternate" content="${escapeAttr(stdDocAtUri)}">`);
+          inject.push(`<meta property="at:standard.site:pub" content="${escapeAttr(`at://${did}/site.standard.publication/self`)}">`);
+        }
+      }
+      const html = inject.length
+        ? rawHtml.replace(/<\/head>/i, `${inject.join("")}</head>`)
         : rawHtml;
 
       const headers: Record<string, string> = {
