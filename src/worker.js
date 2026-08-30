@@ -222,6 +222,16 @@ export default {
       if (url.pathname === "/.well-known/site.standard.publication") {
         return handleStandardSiteWellKnown(host);
       }
+      // Publication root: did-*.lopecode.com/ is the standard.site
+      // publication.url. The render Worker only serves /r/:rkey, so serve
+      // the author's Ledger in place at the bare root — the user stays on
+      // their own subdomain (no redirect). The Ledger bundle lives in
+      // LEDGER_DID's repo; proxyBundle renders it while the URL bar keeps
+      // the subdomain, and the Ledger reads the did from location.hostname
+      // to scope the listing to this author.
+      if (url.pathname === "/" || url.pathname === "") {
+        return proxyBundle(request, env, url, LEDGER_DID, LEDGER_RKEY);
+      }
       return env.RENDER.fetch(request);
     }
 
