@@ -7,6 +7,7 @@
 
 import { renderBundle } from "./render.mjs";
 import { fetchPublicationUri } from "./publication.mjs";
+import { bylineHtml, escapeAttr, injectBefore } from "./page.mjs";
 
 const SUBDOMAIN_RE = /^did-([a-z]+)-([a-z0-9]+)\.lopecode\.com$/i;
 const RKEY_RE = /^\/r\/([A-Za-z0-9._~-]+)\/?$/;
@@ -92,6 +93,7 @@ interface BundleRecord {
     description?: string;
     coverImage?: { ref: { $link: string }; mimeType: string; size: number };
     stdDocUri?: string;
+    bskyPostUri?: string;
     files: FileEntry[];
     createdAt: string;
   };
@@ -184,9 +186,6 @@ async function handleWellKnownPublication(did: string, host: string): Promise<Re
     headers: { ...headers, "cache-control": "public, max-age=300" }
   });
 }
-
-const escapeAttr = (s: string): string =>
-  s.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 
 function html404(message: string): Response {
   return new Response(
@@ -308,9 +307,13 @@ export default {
       const stdDocAtUri = record.value.stdDocUri;
       const bundleAtUri = `at://${did}/com.lopecode.bundle/${rkey}`;
       const meAtUri = `at://${did}`;
+      const handle = handleOf(didDoc) ?? did;
       const inject: string[] = [];
       if (stdDocAtUri && !rawHtml.includes('rel="site.standard.document"')) {
         inject.push(`<link rel="site.standard.document" href="${escapeAttr(stdDocAtUri)}">`);
+      }
+      if (!rawHtml.includes('rel="author"')) {
+        inject.push(`<link rel="author" href="${escapeAttr(`https://lopecode.com/@${encodeURIComponent(handle)}`)}">`);
       }
       if (!rawHtml.includes('property="at:canonical"')) {
         inject.push(`<meta property="at:canonical" content="${escapeAttr(bundleAtUri)}">`);
@@ -327,9 +330,10 @@ export default {
           }
         }
       }
-      const html = inject.length
-        ? rawHtml.replace(/<\/head>/i, () => `${inject.join("")}</head>`)
-        : rawHtml;
+      let html = inject.length ? injectBefore(rawHtml, "head", inject.join("")) : rawHtml;
+      if (!html.includes('id="lope-byline"')) {
+        html = injectBefore(html, "body", bylineHtml(handle, record.value.bskyPostUri));
+      }
 
       const headers: Record<string, string> = {
         "content-type": "text/html; charset=utf-8",
