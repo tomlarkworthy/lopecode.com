@@ -2,7 +2,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bylineHtml, escapeAttr, injectBefore } from "./page.mjs";
+import { BYLINE_HEADER, bylineHtml, bylineSuppressed, escapeAttr, injectBefore } from "./page.mjs";
 
 const POST = "at://did:plc:j7nm3lrd5h7fm3sfhcv3lhfv/app.bsky.feed.post/3mnehmlq3sd2d";
 
@@ -56,4 +56,12 @@ test("injectBefore takes the LAST </body> and the FIRST </head>", () => {
 
 test("injectBefore keeps $-sequences in the markup literal", () => {
   assert.equal(injectBefore("<body></body>", "body", "$&$'"), "<body>$&$'</body>");
+});
+
+test("bylineSuppressed only fires on the apex proxy's header", () => {
+  assert.equal(bylineSuppressed(new Headers()), false);
+  assert.equal(bylineSuppressed(new Headers({ [BYLINE_HEADER]: "off" })), true);
+  assert.equal(bylineSuppressed(new Headers({ [BYLINE_HEADER]: " OFF " })), true);
+  assert.equal(bylineSuppressed(new Headers({ [BYLINE_HEADER]: "on" })), false);
+  assert.equal(bylineSuppressed(undefined), false);
 });

@@ -35,17 +35,22 @@ async function proxyBundle(request, env, originalUrl, did, rkey) {
   // Pass through to the render Worker; the response body is the
   // composed lopebook HTML — we relay it as-is so the URL bar keeps
   // its original path.
+  // The chrome routes (Lopefeed at /, Ledger at /@handle) are the site's
+  // own furniture, not a published bundle page, so they get the head
+  // link/meta tags but not the "by @handle" pill.
+  const headers = new Headers(request.headers);
+  headers.set("x-lopecode-byline", "off");
   const renderRequest = new Request(renderUrl.toString(), {
     method: request.method,
-    headers: request.headers,
+    headers,
     body: request.method === "GET" || request.method === "HEAD" ? null : await request.arrayBuffer()
   });
   const upstream = await env.RENDER.fetch(renderRequest);
   // Clone headers so we can override cache-control without leaking the
   // render Worker's headers verbatim (it sets max-age=300 which is fine
   // but we may want to vary by URL eventually).
-  const headers = new Headers(upstream.headers);
-  return new Response(upstream.body, { status: upstream.status, headers });
+  const out = new Headers(upstream.headers);
+  return new Response(upstream.body, { status: upstream.status, headers: out });
 }
 
 const SIBLING_HOSTS = {

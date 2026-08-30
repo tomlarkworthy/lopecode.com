@@ -1,5 +1,20 @@
 // Markup the render Worker injects into an exported bundle.
 
+// The apex Worker proxies its own chrome — the Lopefeed at `/` and the
+// Ledger at `/@handle` — through /r/:rkey. Those pages are the site's
+// furniture, not someone's published bundle, so they keep the head
+// link/meta tags but not the byline pill. The proxy says so with this
+// header; a direct request never carries it.
+export const BYLINE_HEADER = "x-lopecode-byline";
+
+/**
+ * @param {Headers} [headers]
+ * @returns {boolean}
+ */
+export function bylineSuppressed(headers) {
+  return (headers?.get(BYLINE_HEADER) ?? "").trim().toLowerCase() === "off";
+}
+
 /**
  * @param {string} s
  * @returns {string}

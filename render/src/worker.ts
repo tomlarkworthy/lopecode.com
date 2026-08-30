@@ -7,7 +7,7 @@
 
 import { renderBundle } from "./render.mjs";
 import { fetchPublicationUri } from "./publication.mjs";
-import { bylineHtml, escapeAttr, injectBefore } from "./page.mjs";
+import { bylineHtml, bylineSuppressed, escapeAttr, injectBefore } from "./page.mjs";
 
 const SUBDOMAIN_RE = /^did-([a-z]+)-([a-z0-9]+)\.lopecode\.com$/i;
 const RKEY_RE = /^\/r\/([A-Za-z0-9._~-]+)\/?$/;
@@ -331,7 +331,7 @@ export default {
         }
       }
       let html = inject.length ? injectBefore(rawHtml, "head", inject.join("")) : rawHtml;
-      if (!html.includes('id="lope-byline"')) {
+      if (!bylineSuppressed(request.headers) && !html.includes('id="lope-byline"')) {
         html = injectBefore(html, "body", bylineHtml(handle, record.value.bskyPostUri));
       }
 
