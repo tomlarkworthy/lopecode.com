@@ -3,9 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "app.bsky.feed.generator Worker: Bluesky-side discovery feed for com.lopecode.bundle. Skeletons of recent companion-bsky posts, derived from the bundle/post shared-rkey convention.",
+  "description": "app.bsky.feed.generator Worker: Bluesky-side discovery feed for com.lopecode.bundle. Skeletons of the companion bsky posts recorded on each bundle.",
   "scripts": {
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "node --test src/*.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250124.0",

@@ -15,6 +15,8 @@
 // DID declares the feed and points its `did` field at FEED_DID. The
 // AppView resolves FEED_DID via the did:web doc this Worker serves.
 
+import { skeletonItems } from "./skeleton.mjs";
+
 interface Env {
   CONTRAIL: Fetcher;
 }
@@ -34,22 +36,12 @@ const FEED_URI = `at://${FEED_PUBLISHER_DID}/app.bsky.feed.generator/${FEED_RKEY
 interface BundleRecord {
   uri: string;
   cid: string;
-  value: { createdAt: string; title?: string };
+  value: { createdAt: string; title?: string; bskyPostUri?: string };
 }
 
 interface ContrailListRecordsResponse {
   records: BundleRecord[];
   cursor?: string;
-}
-
-// Sidecar rkey convention from at-write: companion app.bsky.feed.post
-// shares the bundle's rkey, so a fetcher can derive one URI from the
-// other without an index.
-function bundleUriToCompanionPostUri(bundleUri: string): string | null {
-  const m = bundleUri.match(/^at:\/\/([^/]+)\/com\.lopecode\.bundle\/(.+)$/);
-  if (!m) return null;
-  const [, did, rkey] = m;
-  return `at://${did}/app.bsky.feed.post/${rkey}`;
 }
 
 function jsonResponse(body: unknown, status = 200, cacheSeconds = 60): Response {
@@ -77,7 +69,11 @@ async function getFeedSkeleton(env: Env, url: URL): Promise<Response> {
   const contrailUrl = new URL(
     "https://contrail.lopecode.com/xrpc/com.lopecode.bundle.listRecords"
   );
-  contrailUrl.searchParams.set("sort", "-createdAt");
+  // Contrail takes field + direction as separate params; a "-field"
+  // prefix is not parsed, it is silently ignored and the page comes
+  // back in insertion order.
+  contrailUrl.searchParams.set("sort", "createdAt");
+  contrailUrl.searchParams.set("order", "desc");
   contrailUrl.searchParams.set("limit", String(limit));
   if (cursor) contrailUrl.searchParams.set("cursor", cursor);
 
@@ -87,10 +83,10 @@ async function getFeedSkeleton(env: Env, url: URL): Promise<Response> {
   }
   const data = (await r.json()) as ContrailListRecordsResponse;
 
-  const items = data.records
-    .map(rec => bundleUriToCompanionPostUri(rec.uri))
-    .filter((uri): uri is string => uri !== null)
-    .map(post => ({ post }));
+  // Bundles with no companion post are skipped, so a page can come back
+  // shorter than `limit` (or empty). That is correct for a skeleton —
+  // the client pages on `cursor`, not on item count.
+  const items = skeletonItems(data.records);
 
   return jsonResponse({ feed: items, cursor: data.cursor });
 }
