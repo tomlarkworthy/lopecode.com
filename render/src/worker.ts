@@ -6,9 +6,11 @@
 // chrome wrapper.
 
 import { renderBundle } from "./render.mjs";
+import { fetchPublicationUri } from "./publication.mjs";
 
 const SUBDOMAIN_RE = /^did-([a-z]+)-([a-z0-9]+)\.lopecode\.com$/i;
 const RKEY_RE = /^\/r\/([A-Za-z0-9._~-]+)\/?$/;
+const WELL_KNOWN_PUB = "/.well-known/site.standard.publication";
 
 // Bump to invalidate every cached blob. Used as a path segment in the
 // caches.default cache key — bumping changes the key, so the next
@@ -95,33 +97,92 @@ interface BundleRecord {
   };
 }
 
-async function resolvePds(did: string): Promise<string> {
+interface DidDoc {
+  alsoKnownAs?: string[];
+  service?: Array<{ id: string; type: string; serviceEndpoint: string }>;
+}
+
+async function fetchDidDoc(did: string): Promise<DidDoc> {
   if (did.startsWith("did:plc:")) {
     const r = await fetch(`https://plc.directory/${did}`);
     if (!r.ok) throw new Error(`plc.directory ${r.status}`);
-    const doc = (await r.json()) as {
-      service?: Array<{ id: string; type: string; serviceEndpoint: string }>;
-    };
-    const svc = (doc.service ?? []).find(
-      s => s.id === "#atproto_pds" || s.type === "AtprotoPersonalDataServer"
-    );
-    if (!svc) throw new Error(`No PDS service for ${did}`);
-    return svc.serviceEndpoint;
+    return (await r.json()) as DidDoc;
   }
   if (did.startsWith("did:web:")) {
     const host = did.slice("did:web:".length).replace(/:/g, "/");
     const r = await fetch(`https://${host}/.well-known/did.json`);
     if (!r.ok) throw new Error(`did:web ${r.status}`);
-    const doc = (await r.json()) as {
-      service?: Array<{ id: string; type: string; serviceEndpoint: string }>;
-    };
-    const svc = (doc.service ?? []).find(
-      s => s.id === "#atproto_pds" || s.type === "AtprotoPersonalDataServer"
-    );
-    if (!svc) throw new Error(`No PDS service for ${did}`);
-    return svc.serviceEndpoint;
+    return (await r.json()) as DidDoc;
   }
   throw new Error(`Unsupported DID method: ${did}`);
+}
+
+function pdsOf(doc: DidDoc, did: string): string {
+  const svc = (doc.service ?? []).find(
+    s => s.id === "#atproto_pds" || s.type === "AtprotoPersonalDataServer"
+  );
+  if (!svc) throw new Error(`No PDS service for ${did}`);
+  return svc.serviceEndpoint;
+}
+
+// The DID's primary handle, e.g. `larkworthy.bsky.social`. Absent from
+// a doc that has never been claimed by a handle; callers fall back to
+// the DID, which every surface that takes a handle also accepts.
+function handleOf(doc: DidDoc): string | null {
+  const aka = (doc.alsoKnownAs ?? []).find(u => u.startsWith("at://"));
+  return aka ? aka.slice("at://".length) : null;
+}
+
+// Cached `site.standard.publication` AT-URI for this host, or null when
+// the author has none. Empty body is a cached negative — the lookup is
+// two upstream round-trips and every render needs it, so we hold both
+// answers for 5 minutes.
+async function publicationUriFor(pds: string, did: string, host: string): Promise<string | null> {
+  const cacheKey = new Request(
+    `https://lopecode-render.invalid/pub/${BLOB_CACHE_VERSION}/${encodeURIComponent(host)}`
+  );
+  const cached = await caches.default.match(cacheKey);
+  if (cached) return (await cached.text()).trim() || null;
+
+  const uri = await fetchPublicationUri(pds, did, host);
+  await caches.default.put(cacheKey, new Response(uri ?? "", {
+    headers: {
+      "cache-control": "public, max-age=300",
+      "content-type": "text/plain; charset=utf-8"
+    }
+  }));
+  return uri;
+}
+
+// standard.site verification endpoint: a bare AT-URI in text/plain that
+// names the publication this origin serves. Indexers fetch it from the
+// publication's declared `url` to confirm the hosting is the author's.
+async function handleWellKnownPublication(did: string, host: string): Promise<Response> {
+  const headers: Record<string, string> = {
+    "content-type": "text/plain; charset=utf-8",
+    "access-control-allow-origin": "*"
+  };
+  let uri: string | null;
+  try {
+    const doc = await fetchDidDoc(did);
+    uri = await publicationUriFor(pdsOf(doc, did), did, host);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return new Response(`publication lookup failed: ${msg}\n`, {
+      status: 502,
+      headers: { ...headers, "cache-control": "no-store" }
+    });
+  }
+  if (!uri) {
+    return new Response("no site.standard.publication for this host\n", {
+      status: 404,
+      headers: { ...headers, "cache-control": "public, max-age=60" }
+    });
+  }
+  return new Response(`${uri}\n`, {
+    status: 200,
+    headers: { ...headers, "cache-control": "public, max-age=300" }
+  });
 }
 
 const escapeAttr = (s: string): string =>
@@ -142,12 +203,17 @@ export default {
     if (!m) return html404(`Unknown host: <code>${host}</code>`);
     const did = `did:${m[1].toLowerCase()}:${m[2].toLowerCase()}`;
 
+    if (url.pathname === WELL_KNOWN_PUB) {
+      return handleWellKnownPublication(did, host);
+    }
+
     const p = url.pathname.match(RKEY_RE);
     if (!p) return html404("Expected <code>/r/:rkey</code>.");
     const rkey = p[1];
 
     try {
-      const pds = await resolvePds(did);
+      const didDoc = await fetchDidDoc(did);
+      const pds = pdsOf(didDoc, did);
       const record = await fetchRecord(pds, did, rkey);
 
       // ?file=<id> — return the decoded source of a single file as an
@@ -252,11 +318,17 @@ export default {
         inject.push(`<meta property="at:me" content="${escapeAttr(meAtUri)}">`);
         if (stdDocAtUri) {
           inject.push(`<meta property="at:alternate" content="${escapeAttr(stdDocAtUri)}">`);
-          inject.push(`<meta property="at:standard.site:pub" content="${escapeAttr(`at://${did}/site.standard.publication/self`)}">`);
+          // Same lookup the .well-known answers with, so the page's claim
+          // and the verification endpoint can never disagree. Best-effort:
+          // a PDS hiccup drops the meta, it never fails the render.
+          const pubAtUri = await publicationUriFor(pds, did, host).catch(() => null);
+          if (pubAtUri) {
+            inject.push(`<meta property="at:standard.site:pub" content="${escapeAttr(pubAtUri)}">`);
+          }
         }
       }
       const html = inject.length
-        ? rawHtml.replace(/<\/head>/i, `${inject.join("")}</head>`)
+        ? rawHtml.replace(/<\/head>/i, () => `${inject.join("")}</head>`)
         : rawHtml;
 
       const headers: Record<string, string> = {
