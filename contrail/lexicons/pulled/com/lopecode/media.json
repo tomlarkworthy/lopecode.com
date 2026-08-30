@@ -1,0 +1,42 @@
+{
+  "lexicon": 1,
+  "id": "com.lopecode.media",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "any",
+      "description": "A card asset for one notebook: a still poster and, optionally, a short looping video. Written by its own upload step, BEFORE and independently of any com.lopecode.bundle publish, so the URL exists at export time and can be authored into the notebook's <head>. rkey is the poster blob's CID (base32 CIDv1 is lowercase alphanumeric, inside the rkey charset), which makes the media proxy's authorisation a single O(1) getRecord against the key it already has in the URL, and makes the record immutable in practice: new bytes mean a new CID, a new rkey and a new record. Never mutate one in place -- the proxy serves these with a far-future immutable cache, and the notebook head that points at it is the mutable pointer.",
+      "record": {
+        "type": "object",
+        "required": ["poster", "createdAt"],
+        "properties": {
+          "poster": {
+            "type": "blob",
+            "accept": ["image/*"],
+            "maxSize": 1000000,
+            "description": "The still card image, and the only field every consumer can rely on. Capped at 1MB deliberately: this same blob is reused verbatim as com.lopecode.bundle.coverImage and site.standard.document.coverImage (both maxSize 1000000) and as the app.bsky.feed.post embed thumb, so anything larger could be stored here and then silently fail to mirror."
+          },
+          "video": {
+            "type": "blob",
+            "accept": ["video/*"],
+            "maxSize": 5000000,
+            "description": "Optional short, muted, looping clip for surfaces we render ourselves -- the Lopefeed card, the Ledger row, the served /r/ page. Social cards cannot use it: app.bsky.feed.post embeds carry a still thumb only, and cdn.bsky.app transcodes to JPEG. Emitted as og:video for the crawlers that do honour it. The 9 clips already in lopebooks/assets run 24KB-252KB, so this cap is generous."
+          },
+          "alt": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Alt text for the poster. This record is the only place it can live -- neither og:image nor the bundle's coverImage blob has anywhere to put it."
+          },
+          "width": { "type": "integer", "minimum": 1, "description": "Poster width in pixels. Lets a consumer reserve layout space before the bytes arrive." },
+          "height": { "type": "integer", "minimum": 1, "description": "Poster height in pixels." },
+          "sourceId": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "Provenance, when the poster was picked out of a notebook rather than uploaded: the <script id> of the file attachment it came from, e.g. \"@tomlarkworthy/tarot/card-back.png\". Absent for a direct upload."
+          },
+          "createdAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    }
+  }
+}

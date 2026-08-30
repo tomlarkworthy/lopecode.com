@@ -6,7 +6,7 @@
   "scripts": {
     "preview": "python3 -m http.server 8788 --directory pages/public --bind 127.0.0.1",
     "preview:cf": "bunx wrangler pages dev pages/public --port 8788",
-    "test": "npm --prefix render test && npm --prefix feed test",
-    "typecheck": "render/node_modules/.bin/tsc --noEmit -p render/tsconfig.json && feed/node_modules/.bin/tsc --noEmit -p feed/tsconfig.json && contrail/node_modules/.bin/tsc --noEmit -p contrail/tsconfig.json"
+    "test": "npm --prefix render test && npm --prefix feed test && npm --prefix media test",
+    "typecheck": "render/node_modules/.bin/tsc --noEmit -p render/tsconfig.json && feed/node_modules/.bin/tsc --noEmit -p feed/tsconfig.json && contrail/node_modules/.bin/tsc --noEmit -p contrail/tsconfig.json && media/node_modules/.bin/tsc --noEmit -p media/tsconfig.json"
   }
 }

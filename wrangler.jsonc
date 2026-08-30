@@ -30,6 +30,7 @@
   "services": [
     { "binding": "CONTRAIL", "service": "lopecode-contrail" },
     { "binding": "RENDER", "service": "lopecode-render" },
-    { "binding": "FEED", "service": "lopecode-feed" }
+    { "binding": "FEED", "service": "lopecode-feed" },
+    { "binding": "IMAGES", "service": "lopecode-media" }
   ]
 }
