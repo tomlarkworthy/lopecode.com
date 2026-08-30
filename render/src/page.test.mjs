@@ -40,6 +40,20 @@ test("injectBefore inserts before the closing tag, appends when absent", () => {
   assert.equal(injectBefore("x", "body", "<i>"), "x<i>");
 });
 
+// A lopebook carries exporter-3's source, whose HTML template is a
+// literal `…</body></html>` inside a <script type="text/plain"> block.
+test("injectBefore takes the LAST </body> and the FIRST </head>", () => {
+  const doc = "<head>H</head><body>a<script>`</head></body>`</script>b</body>";
+  assert.equal(
+    injectBefore(doc, "body", "<i>"),
+    "<head>H</head><body>a<script>`</head></body>`</script>b<i></body>"
+  );
+  assert.equal(
+    injectBefore(doc, "head", "<i>"),
+    "<head>H<i></head><body>a<script>`</head></body>`</script>b</body>"
+  );
+});
+
 test("injectBefore keeps $-sequences in the markup literal", () => {
   assert.equal(injectBefore("<body></body>", "body", "$&$'"), "<body>$&$'</body>");
 });

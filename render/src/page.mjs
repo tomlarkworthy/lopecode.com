@@ -39,10 +39,17 @@ export function bylineHtml(handle, bskyPostUri) {
 }
 
 /**
- * Insert `markup` before the closing tag, or append when the document
- * has none (exporter output is well-formed, but a bundle is arbitrary
- * bytes). A function replacer keeps `$&`-style sequences in `markup`
- * literal, and re-emits the tag as it was written.
+ * Insert `markup` before the document's own closing tag, or append when
+ * it has none.
+ *
+ * `</head>` and `</body>` both occur more than once in a lopebook: the
+ * bundle carries @tomlarkworthy/exporter-3's source, and that module's
+ * HTML template is a literal ending `</body>\n</html>`, sitting in a
+ * `<script type="text/plain">` block. Anchoring naively on the first
+ * `</body>` injects into that template instead of the page. The
+ * document's head closes before any block; its body closes after all of
+ * them — so take the first head match and the last body match, and
+ * splice rather than replace so the tag survives verbatim.
  *
  * @param {string} html
  * @param {"head"|"body"} tag
@@ -50,6 +57,8 @@ export function bylineHtml(handle, bskyPostUri) {
  * @returns {string}
  */
 export function injectBefore(html, tag, markup) {
-  const re = new RegExp(`</${tag}>`, "i");
-  return re.test(html) ? html.replace(re, m => `${markup}${m}`) : html + markup;
+  const hits = [...html.matchAll(new RegExp(`</${tag}>`, "gi"))];
+  if (!hits.length) return html + markup;
+  const at = (tag === "body" ? hits[hits.length - 1] : hits[0]).index;
+  return html.slice(0, at) + markup + html.slice(at);
 }
