@@ -9,7 +9,10 @@ import fs from "node:fs/promises";
 import { renderBundle } from "./render.mjs";
 
 const DID = "did:plc:j7nm3lrd5h7fm3sfhcv3lhfv";
-const RKEY = process.argv[2] || "3mkshbxcynv2z";
+// A live slug-keyed bundle. The old TID default (3mkshbxcynv2z) is gone
+// from the repo — publishing moved to slug rkeys — and the script died
+// on `record.value` being undefined.
+const RKEY = process.argv[2] || "atproto";
 
 const plc = await fetch(`https://plc.directory/${DID}`).then(r => r.json());
 const pds = plc.service.find(s => s.id === "#atproto_pds").serviceEndpoint;
