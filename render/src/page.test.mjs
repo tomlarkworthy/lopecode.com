@@ -2,7 +2,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BYLINE_HEADER, bylineHtml, bylineSuppressed, escapeAttr, injectBefore } from "./page.mjs";
+import { BYLINE_HEADER, bylineHtml, bylineSuppressed, escapeAttr, headOf, injectBefore } from "./page.mjs";
 
 const POST = "at://did:plc:j7nm3lrd5h7fm3sfhcv3lhfv/app.bsky.feed.post/3mnehmlq3sd2d";
 
@@ -64,4 +64,11 @@ test("bylineSuppressed only fires on the apex proxy's header", () => {
   assert.equal(bylineSuppressed(new Headers({ [BYLINE_HEADER]: " OFF " })), true);
   assert.equal(bylineSuppressed(new Headers({ [BYLINE_HEADER]: "on" })), false);
   assert.equal(bylineSuppressed(undefined), false);
+});
+
+test("headOf stops at the FIRST </head>, so a text/plain copy is out of scope", () => {
+  const doc = '<head>H</head><body><script>`<head>X</head>`</script></body>';
+  assert.equal(headOf(doc), "<head>H");
+  assert.equal(headOf("<HEAD>H</HEAD>rest"), "<HEAD>H");
+  assert.equal(headOf("no head here"), "no head here");
 });

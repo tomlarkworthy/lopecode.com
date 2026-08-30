@@ -54,6 +54,21 @@ export function bylineHtml(handle, bskyPostUri) {
 }
 
 /**
+ * The document's own <head>, for "did the export already bake this tag?"
+ * checks. Searching the whole document instead would false-positive: a
+ * lopebook carries @tomlarkworthy/exporter-3's source, and that source
+ * contains the literal `<meta property="og:image" ...>` of its own head
+ * template inside a `<script type="text/plain">` block.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+export function headOf(html) {
+  const at = html.search(/<\/head>/i);
+  return at === -1 ? html : html.slice(0, at);
+}
+
+/**
  * Insert `markup` before the document's own closing tag, or append when
  * it has none.
  *

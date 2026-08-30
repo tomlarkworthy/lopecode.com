@@ -55,7 +55,10 @@ async function proxyBundle(request, env, originalUrl, did, rkey) {
 
 const SIBLING_HOSTS = {
   "contrail.lopecode.com": "CONTRAIL",
-  "feed.lopecode.com": "FEED"
+  "feed.lopecode.com": "FEED",
+  // images.lopecode.com/<did>/<rkey>[/video] — com.lopecode.media blobs,
+  // authorised by getRecord and served from the author's PDS.
+  "images.lopecode.com": "IMAGES"
 };
 
 // did-{method}-{rest}.lopecode.com — method is alpha (plc / web / key),

@@ -8,6 +8,7 @@
 import { renderBundle } from "./render.mjs";
 import { fetchPublicationUri } from "./publication.mjs";
 import { bylineHtml, bylineSuppressed, escapeAttr, injectBefore } from "./page.mjs";
+import { fetchMediaRecord, mediaImageUrl, socialMetaTagsFor } from "./media.mjs";
 
 const SUBDOMAIN_RE = /^did-([a-z]+)-([a-z0-9]+)\.lopecode\.com$/i;
 const RKEY_RE = /^\/r\/([A-Za-z0-9._~-]+)\/?$/;
@@ -156,6 +157,39 @@ async function publicationUriFor(pds: string, did: string, host: string): Promis
   return uri;
 }
 
+// The com.lopecode.media record for a bundle's coverImage, or null.
+// Cached both ways: a hit is immutable by construction (the rkey is the
+// poster CID, so new bytes mean a new record, never an edit), a miss is
+// held only briefly because a media record can be written after the
+// bundle that points at it.
+//
+// Never throws. This is one extra upstream call on the render path and
+// og:image does not depend on it — a failure has to degrade to "no
+// og:video", not to a broken page.
+async function mediaRecordFor(pds: string, did: string, cid: string): Promise<any | null> {
+  const cacheKey = new Request(
+    `https://lopecode-render.invalid/media/${BLOB_CACHE_VERSION}/${encodeURIComponent(did)}/${encodeURIComponent(cid)}`
+  );
+  try {
+    const cached = await caches.default.match(cacheKey);
+    if (cached) {
+      const body = (await cached.text()).trim();
+      return body ? JSON.parse(body) : null; // empty body is the cached negative
+    }
+
+    const value = await fetchMediaRecord(pds, did, cid);
+    await caches.default.put(cacheKey, new Response(value ? JSON.stringify(value) : "", {
+      headers: {
+        "cache-control": `public, max-age=${value ? 86400 : 300}`,
+        "content-type": "application/json"
+      }
+    }));
+    return value;
+  } catch {
+    return null;
+  }
+}
+
 // standard.site verification endpoint: a bare AT-URI in text/plain that
 // names the publication this origin serves. Indexers fetch it from the
 // publication's declared `url` to confirm the hosting is the author's.
@@ -283,12 +317,21 @@ export default {
         })
       );
 
-      // og:image points at the PDS-served cover blob (a record field, not a
-      // bundle file). Public, content-addressed, cacheable — fine for scrapers.
+      // og:image points at the cover blob (a record field, not a bundle
+      // file) THROUGH the media proxy rather than at this PDS's getBlob.
+      // A getBlob URL names whichever PDS the author was on when the
+      // bundle was baked, and atproto supports PDS migration; once a
+      // scraper has cached the card, that URL is frozen and would 404
+      // after a move. images.lopecode.com resolves DID→PDS per request.
+      // The proxy URL is derivable from the bundle record alone: a
+      // com.lopecode.media record's rkey IS its poster CID, and
+      // coverImage is that same blob.
       const coverCid = record.value.coverImage?.ref?.$link;
-      const coverUrl = coverCid
-        ? `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(coverCid)}`
-        : undefined;
+      const coverUrl = coverCid ? mediaImageUrl(did, coverCid) : undefined;
+
+      // The media record carries what the blob cannot: the video variant
+      // and the poster's alt text. Cached, and null on any failure.
+      const media = coverCid ? await mediaRecordFor(pds, did, coverCid) : null;
 
       const rawHtml = await renderBundle({ record, blobs, coverUrl });
 
@@ -330,6 +373,13 @@ export default {
           }
         }
       }
+      // og:video / og:video:type / og:image:alt / twitter:card. Injected
+      // here rather than threaded through lopebook() because
+      // render/src/exporter-3.js is a stale vendored copy of the
+      // canonical @tomlarkworthy/exporter-3 — no head-scan, no `metas`
+      // passthrough — and resyncing it is out of scope.
+      inject.push(...socialMetaTagsFor(rawHtml, { did, coverCid, media }));
+
       let html = inject.length ? injectBefore(rawHtml, "head", inject.join("")) : rawHtml;
       if (!bylineSuppressed(request.headers) && !html.includes('id="lope-byline"')) {
         html = injectBefore(html, "body", bylineHtml(handle, record.value.bskyPostUri));

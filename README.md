@@ -14,10 +14,11 @@ src/worker.js             # Worker entry: Host-based routing
 pages/public/             # Static assets: 404 page + the OAuth relay surface
 render/                   # lopecode-render Worker: bundle -> HTML (did-*.lopecode.com)
 feed/                     # lopecode-feed Worker: app.bsky.feed.generator
+media/                    # lopecode-media Worker: com.lopecode.media blobs (images.lopecode.com)
 contrail/                 # lopecode-contrail Worker: com.lopecode.bundle indexer
 ```
 
-The Worker routes by Host, and runs before the assets binding (`run_worker_first`). On the apex it serves `/` and `/@handle` by rendering a published bundle — the Lopefeed and the Ledger — through the render Worker, so both are notebooks, not static pages; `pages/public/` is reached only for what those routes do not claim, which today is the 404 page and the OAuth relay surface. `did-{method}-{rest}.lopecode.com` goes to the render Worker: `/r/:rkey` renders that bundle, `/.well-known/site.standard.publication` answers standard.site verification, and `/` serves the author's Ledger. Sibling Workers on their own subdomains (`contrail`, `feed`) are forwarded by service binding, because the wildcard route shadows their Custom Domains.
+The Worker routes by Host, and runs before the assets binding (`run_worker_first`). On the apex it serves `/` and `/@handle` by rendering a published bundle — the Lopefeed and the Ledger — through the render Worker, so both are notebooks, not static pages; `pages/public/` is reached only for what those routes do not claim, which today is the 404 page and the OAuth relay surface. `did-{method}-{rest}.lopecode.com` goes to the render Worker: `/r/:rkey` renders that bundle, `/.well-known/site.standard.publication` answers standard.site verification, and `/` serves the author's Ledger. Sibling Workers on their own subdomains (`contrail`, `feed`, `images`) are forwarded by service binding, because the wildcard route shadows their Custom Domains.
 
 ## Tests and typecheck
 
