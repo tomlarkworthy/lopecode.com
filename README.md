@@ -11,13 +11,13 @@ The apex (`lopecode.com`) is served by a **Workers Static Assets** project named
 ```
 wrangler.jsonc            # Worker config: routes, assets binding
 src/worker.js             # Worker entry: Host-based routing
-pages/public/             # Static assets served at lopecode.com (apex)
-workers/feed/             # (planned) feed.lopecode.com feed-generator Worker
-contrail/                 # (planned) Contrail indexer Worker + D1
-lexicons/                 # (planned) com.lopecode.* lexicon JSONs (no current consumer)
+pages/public/             # Static assets: 404 page + the OAuth relay surface
+render/                   # lopecode-render Worker: bundle -> HTML (did-*.lopecode.com)
+feed/                     # lopecode-feed Worker: app.bsky.feed.generator
+contrail/                 # lopecode-contrail Worker: com.lopecode.bundle indexer
 ```
 
-The Worker handles both the apex static surface and the per-DID web proxy on `*.lopecode.com` — it routes by Host. Apex/www requests delegate to the ASSETS binding; `did-{method}-{rest}.lopecode.com/r/:rkey` requests 302 to the canonical at-read on GitHub Pages with the `at://` URI in the hash. Future Workers (feed generator, Contrail indexer) live in their own subdirectories on dedicated subdomains.
+The Worker routes by Host, and runs before the assets binding (`run_worker_first`). On the apex it serves `/` and `/@handle` by rendering a published bundle — the Lopefeed and the Ledger — through the render Worker, so both are notebooks, not static pages; `pages/public/` is reached only for what those routes do not claim, which today is the 404 page and the OAuth relay surface. `did-{method}-{rest}.lopecode.com` goes to the render Worker: `/r/:rkey` renders that bundle, `/.well-known/site.standard.publication` answers standard.site verification, and `/` serves the author's Ledger. Sibling Workers on their own subdomains (`contrail`, `feed`) are forwarded by service binding, because the wildcard route shadows their Custom Domains.
 
 ## Local preview
 
@@ -25,7 +25,7 @@ The Worker handles both the apex static surface and the per-DID web proxy on `*.
 bun run preview
 ```
 
-Serves `pages/public/` on `http://localhost:8788` via Python&rsquo;s built-in static server &mdash; zero install, fine for plain HTML.
+Serves `pages/public/` on `http://localhost:8788` via Python&rsquo;s built-in static server &mdash; zero install, fine for plain HTML. There is no `index.html`, so the root is a directory listing; the pages worth opening are `/404.html` and `/oauth/`.
 
 For true Cloudflare parity (assets binding, `_redirects`, `_headers`, future Worker entry):
 

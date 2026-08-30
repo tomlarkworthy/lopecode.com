@@ -1,6 +1,7 @@
-# /@:handle is now handled by the apex Worker — it proxies through to
-# the @lopecode/ledger notebook bundle (LEDGER_RKEY in src/worker.js)
-# via the render Worker, keeping the URL bar at lopecode.com/@:handle.
+# The apex Worker runs before this file (run_worker_first), and claims
+# `/` and `/@:handle` — both are rendered notebook bundles (LOPEFEED_RKEY
+# and LEDGER_RKEY in src/worker.js), not static pages. Only paths the
+# Worker does not claim reach the assets binding and these rules.
 
 # Stable shortlink to the atproto integration spec.
 /spec  https://github.com/tomlarkworthy/lopecode-dev/blob/main/specs/atproto.md  302
