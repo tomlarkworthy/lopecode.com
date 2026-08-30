@@ -84,12 +84,28 @@ PR previews are on by default — every PR triggers a non-production Workers bui
 
 - Push to `main` → Workers Builds deploys automatically. No CI tokens needed; the GitHub integration handles auth.
 - Open a PR → preview deploy with a unique URL. Merge after eyeballing.
-- Future Workers in `workers/` get their own `wrangler.jsonc` and are deployed via `wrangler deploy` from GitHub Actions using **Cloudflare's OIDC** (no long-lived API tokens). One workflow per Worker so failures stay isolated.
+- That connection covers the **apex Worker only**. `feed/`, `render/` and `contrail/` are separate
+  Cloudflare Workers; a push touching them does not redeploy them by itself. On 2026-08-30 a push
+  carrying a `feed` fix redeployed apex and render and left `lopecode-feed` on the previous code —
+  `getFeedSkeleton` kept returning post URIs derived from the bundle rkey, with nothing to show that
+  the deploy had not happened.
+- `.github/workflows/deploy-workers.yml` closes that gap: on a push to `main` it deploys each sibling
+  Worker whose own directory changed (running that Worker's tests and typecheck first), and
+  `workflow_dispatch` deploys one or all on demand. Editing the workflow redeploys everything, so a
+  change to the pipeline is exercised rather than merely committed.
+- It needs two repository secrets: **`CLOUDFLARE_API_TOKEN`** (a scoped token with
+  *Workers Scripts:Edit*, not the Global API key) and **`CLOUDFLARE_ACCOUNT_ID`** (no `wrangler.jsonc`
+  here declares `account_id`, so the token alone is ambiguous on a multi-account login).
+- If you connect a sibling to Workers Builds in the dashboard, remove it from that workflow's matrix.
+  A double deploy ships the same artifact, but it stops being obvious which pipeline did.
 
 ### Security stance
 
 - DNS managed by Cloudflare → wildcard Universal SSL is free, no manual cert renewals.
 - Apex Worker uses GitHub-integrated deploys → no API tokens stored anywhere.
-- Sibling Workers (when added) use OIDC-federated Cloudflare API tokens scoped per-resource. No long-lived secrets.
+- Sibling Workers deploy from GitHub Actions with a scoped `CLOUDFLARE_API_TOKEN` repository secret.
+  This was specified as OIDC-federated; Cloudflare's API has no GitHub OIDC trust relationship to
+  federate against, so it is a stored token limited to *Workers Scripts:Edit*. Rotate it from the
+  Cloudflare dashboard; nothing else in this repo reads it.
 - Branch protection on `main`: required reviews + Workers preview check passing before merge.
 - This repo is **public**. Only public-safe artifacts go in (lexicons, OAuth client metadata, static HTML). Secrets live in `wrangler secret put`.
